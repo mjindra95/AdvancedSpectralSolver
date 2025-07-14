@@ -1,0 +1,1 @@
+Wrote smth about project
