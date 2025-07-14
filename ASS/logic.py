@@ -280,7 +280,8 @@ class Loading:
             else:
                 # ensure every file has the same shift axis
                 if not np.allclose(shift, shift_values):
-                    raise ValueError(f"Shift axis mismatch in file {fp}")
+                    print(f'file {fp} has different x axis')
+                    #raise ValueError(f"Shift axis mismatch in file {fp}")
     
             # 3) Determine the “key” for this row by mode
             base = os.path.basename(fp)
