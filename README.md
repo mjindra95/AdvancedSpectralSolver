@@ -12,3 +12,8 @@ The application supports:
 - Analysis of Raman map in 2D (spatial) and 1D (timescan, linescan and electrochemical potential) mode
 
 Whether you're working on a few spectra or hundreds of Raman maps, this app aims to accelerate insights, reduce manual labor, and improve reproducibility in spectroscopic analysis.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).  
+You are free to use, modify, and distribute this software for personal or commercial use.
