@@ -1,3 +1,5 @@
+<img width="1024" height="1024" alt="logo" src="https://github.com/user-attachments/assets/3ee07d58-e634-4d2f-b433-db2525b6d287" />
+
 This open-source Python application is designed to simplify the analysis of Raman spectroscopy data, with a particular focus on multi-peak fitting, batch data processing, and Raman spectroscopy mapping (1D and 2D). Originally developed for academic and research use, the app provides a powerful, user-friendly graphical interface built with Tkinter, enabling scientists and students to interactively explore and interpret Raman spectra without writing code. So far this app can work with data acquired with HORIBA and Witec equipment, but any other spectrometers could be implemented.
 
 The application supports:
