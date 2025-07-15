@@ -2,6 +2,8 @@
 layout: default
 ---
 
+<link rel="icon" type="image/x-icon" href="Resources/just_logo.ico">
+
 Welcome to the documentation page for the **Advanced Spectral Solver**.
 
 📄 [Download the full help file (PDF)](help.pdf)
