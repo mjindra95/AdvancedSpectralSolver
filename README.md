@@ -30,7 +30,7 @@ Martin Jindra. (2025). *Advanced Spectral Solver (v2.1.1)* [Software]. Zenodo. h
 @software{jindra2025advanced,
   author       = {Martin Jindra},
   title        = {Advanced Spectral Solver},
-  version      = {v1.0.0},
+  version      = {v2.1.1},
   year         = {2025},
   publisher    = {Zenodo},
   doi          = {10.5281/zenodo.15915431},
