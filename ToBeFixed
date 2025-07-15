@@ -1,0 +1,8 @@
+Single file 1D map import for Horiba time and line scan
+Single file 2D map import for Horiba
+Composite model ON/OFF -  control of the self.model_state - add to the update_plot function
+spectrum and map title - how?
+spectrum export from the mapping needs to update the boundaries - important for batch fit
+add title to the plot but add a possiblity to disable it somehow
+add normalization for 1D and 2D maps
+load the help file from doc folder not from the ASS
