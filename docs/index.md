@@ -1,4 +1,3 @@
-# Advanced Spectral Solver
 
 Welcome to the documentation page for the **Advanced Spectral Solver**.
 
