@@ -20,3 +20,19 @@ You are free to use, modify, and distribute this software for personal or commer
 
 # DOI
 [![DOI](https://zenodo.org/badge/1019124526.svg)](https://doi.org/10.5281/zenodo.15915431)
+## Citation
+
+If you use this software in your research, please cite it as:
+
+Martin Jindra. (2025). *Advanced Spectral Solver (v2.1.1)* [Software]. Zenodo. https://doi.org/10.5281/zenodo.15915431
+
+## BibTeX format
+@software{jindra2025advanced,
+  author       = {Martin Jindra},
+  title        = {Advanced Spectral Solver},
+  version      = {v1.0.0},
+  year         = {2025},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.15915431},
+  url          = {https://doi.org/10.5281/zenodo.15915431}
+}
