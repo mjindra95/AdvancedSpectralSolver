@@ -9,4 +9,4 @@ Welcome to the documentation page for the **Advanced Spectral Solver**.
 - 1D/2D batch processing
 - Customizable filtering and export
 
-Visit the [GitHub repository](https://github.com/YOUR_USERNAME/YOUR_REPO) for more details.
+Visit the [GitHub repository](https://github.com/mjindra95/AdvancedSpectralSolver) for more details.
