@@ -17,3 +17,6 @@ Whether you're working on a few spectra or hundreds of Raman maps, this app aims
 
 This project is licensed under the [MIT License](LICENSE).  
 You are free to use, modify, and distribute this software for personal or commercial use.
+
+# DOI
+[![DOI](https://zenodo.org/badge/1019124526.svg)](https://doi.org/10.5281/zenodo.15915431)
