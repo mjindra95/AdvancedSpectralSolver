@@ -62,15 +62,22 @@ class MainWindow:
         file_menu.add_command(label="Load Horiba spectrum", command=self.load_horiba_data, accelerator="Ctrl+h")
         file_menu.add_command(label="Load Witec spectrum", command=self.load_witec_data, accelerator="Ctrl+w")
         file_menu.add_command(label="Load default spectrum", command=self.load_default_data, accelerator="Ctrl+d")
-        file_menu.add_separator()
-        file_menu.add_command(label="Save Plot",    command=self.save_plot,    accelerator="Ctrl+p")
-        file_menu.add_command(label="Save Report",  command=self.save_report,  accelerator="Ctrl+r")
-        file_menu.add_command(label="Save Both",    command=self.save_both,    accelerator="Ctrl+e")
-        file_menu.add_command(label="Save data", command = self.save_data)
-        file_menu.add_command(label="Save spectrum", command = self.save_spectrum)
+        # file_menu.add_separator()
+        # file_menu.add_command(label="Save Plot",    command=self.save_plot,    accelerator="Ctrl+p")
+        # file_menu.add_command(label="Save Report",  command=self.save_report,  accelerator="Ctrl+r")
+        # file_menu.add_command(label="Save Both",    command=self.save_both,    accelerator="Ctrl+e")
+        # file_menu.add_command(label="Save data", command = self.save_data)
+        # file_menu.add_command(label="Save spectrum", command = self.save_spectrum)
         # file_menu.add_separator()
         # file_menu.add_command(label="Compare plot", command=self.show_compare)
         menubar.add_cascade(label="File", menu=file_menu)
+        
+        spectrum_menu = tk.Menu(menubar, tearoff=0)
+        spectrum_menu.add_command(label="Compare spectrum", command=self.compare_spectrum)
+        spectrum_menu.add_command(label="Spectrum operation", command=self.spectrum_operation)
+        spectrum_menu.add_command(label="Save spectrum (data)", command = self.save_spectrum)
+        spectrum_menu.add_command(label="Save spectrum (plot)", command = self.save_plot)
+        menubar.add_cascade(label="Spectrum", menu=spectrum_menu)
 
         model_menu = tk.Menu(menubar, tearoff=0)
         model_menu.add_command(label="Build/Edit Model", command=self.open_model_builder, accelerator = "Ctrl+b")
@@ -80,6 +87,11 @@ class MainWindow:
         model_menu.add_command(label="Clear Model", command=self.clear_model)
         model_menu.add_separator()
         model_menu.add_command(label="Optimize Model", command=self.optimize_model, accelerator="Ctrl+f")
+        model_menu.add_separator()
+        model_menu.add_command(label="Save Plot",    command=self.save_plot,    accelerator="Ctrl+p")
+        model_menu.add_command(label="Save Report",  command=self.save_report,  accelerator="Ctrl+r")
+        model_menu.add_command(label="Save Both",    command=self.save_both,    accelerator="Ctrl+e")
+        model_menu.add_command(label="Save data", command = self.save_data)
         menubar.add_cascade(label="Model", menu=model_menu)
 
         advanced_menu = tk.Menu(menubar, tearoff=0)
@@ -1239,6 +1251,12 @@ class MainWindow:
         
     def excel_plot(self):
         ExcelPlotWindow(self.root)
+        
+    def compare_spectrum(self):
+        messagebox.showinfo("Compare spectrum", "Compare spectrum will be added")
+        
+    def spectrum_operation(self):
+        messagebox.showinfo("Spectrum calculation", "Spectrum calculation will be added")
 
     def run(self):
         self.root.mainloop()
