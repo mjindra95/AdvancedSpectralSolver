@@ -6,3 +6,4 @@ spectrum export from the mapping needs to update the boundaries - important for 
 add title to the plot but add a possiblity to disable it somehow
 add normalization for 1D and 2D maps
 load the help file from doc folder not from the ASS
+Spectra manipulation - already added to gui, just need the logic
