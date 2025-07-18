@@ -36,3 +36,6 @@ Martin Jindra. (2025). *Advanced Spectral Solver (v2.1.1)* [Software]. Zenodo. h
   doi          = {10.5281/zenodo.15915431},
   url          = {https://doi.org/10.5281/zenodo.15915431}
 }
+# Funding
+Funding body: Ministry of Education Youth and Sports
+Project: Advanced MUltiscaLe materials for key Enabling Technologies EH22_008/0004558 
