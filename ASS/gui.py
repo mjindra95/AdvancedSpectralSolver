@@ -35,8 +35,24 @@ class MainWindow:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Advanced Spectral Solver")
-        self.root.geometry("1200x800")
+        # # Get user screen resolution
+        # screen_width = self.root.winfo_screenwidth()
+        # screen_height = self.root.winfo_screenheight()
+
+        # # Set window size (for example, 90% of screen dimensions)
+        # window_width = int(screen_width * 0.8)
+        # window_height = int(screen_height * 0.8)
+
+        # # Center the window
+        # x_pos = (screen_width - window_width) // 2
+        # y_pos = (screen_height - window_height) // 2
+
+        # self.root.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
+        self.root.state("zoomed")
         self.root.resizable(True, True)
+
+        # self.root.geometry("1600x900")
+        # self.root.resizable(True, True)
         self._create_menu()
         self._create_layout()
         self._create_plot()
@@ -48,7 +64,28 @@ class MainWindow:
         
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
+        # Bind resize event for the plot panel
+        self.plot_panel.bind("<Configure>", self._resize_plot)
+        
         self.components = [] 
+        
+        # Force an initial resize once layout is ready
+        self.root.after(100, self._force_initial_resize)
+
+    def _force_initial_resize(self):
+        """Trigger an initial resize after the window is fully drawn."""
+        w = self.plot_panel.winfo_width()
+        h = self.plot_panel.winfo_height()
+        if w > 10 and h > 10:
+            dpi = self.fig.get_dpi()
+            self.fig.set_size_inches(w / dpi, h / dpi)
+            self.canvas.draw()
+        
+    # def _resize_plot(self, event):
+    #     """Resize the matplotlib figure when the plot panel changes size."""
+    #     if event.width > 50 and event.height > 50:  # avoid tiny startup events
+    #         self.fig.set_size_inches(event.width / 300, event.height / 300)
+    #         self.canvas.draw()
 
     def on_close(self):
         self.root.quit()
@@ -169,6 +206,17 @@ class MainWindow:
         widget.bind("<Button-3>", self._on_canvas_right_click)
 
         self.canvas.draw()
+        
+        # Bind the resize of plot_panel to rescale the figure
+        self.plot_panel.bind("<Configure>", self._resize_plot)
+        
+    def _resize_plot(self, event):
+        """Rescale the Matplotlib canvas when the plot panel is resized."""
+        if event.width > 10 and event.height > 10:
+            dpi = self.fig.get_dpi()
+            # convert panel size in pixels to figure size in inches
+            self.fig.set_size_inches(event.width / dpi, event.height / dpi)
+            self.canvas.draw()
         
     def _on_canvas_right_click(self, event):
         menu = tk.Menu(self.root, tearoff=0)
@@ -400,6 +448,18 @@ class MainWindow:
             clear_callback = self.clear_model,
             existing=existing
         )
+        
+        # if not hasattr(self, "model_builder_window") or not self.builder_window.winfo_exists():
+        #     self.builder_window = ModelBuilderWindow(
+        #         master=self.root,
+        #         span_request_callback=self.start_span_selector_for_guess,
+        #         save_callback=self.on_component_saved,
+        #         clear_callback=self.clear_model,
+        #         existing=self.components
+        #     )
+        # else:
+        #     self.builder_window.lift()  # Bring it to front if already open
+
             
     def request_span_selection(self, callback):
         if self.span_request_delegate:
@@ -643,6 +703,35 @@ class MainWindow:
             'covariance':    pcov.tolist(),
             'correlation':   corr.tolist()
         }
+        
+        # print("Updating model builder window 2")
+        
+        # # 6) Notify model builder if it's open
+        # if hasattr(self, "model_builder_window") and self.builder_window.winfo_exists():
+        #     self.builder_window.update_parameters_from_main(self.components)
+            
+        # print("Updating model builder window 3")
+        self.builder_window.destroy()
+        
+        existing = []
+        for i, comp in enumerate(self.components, start=1):
+            existing.append({
+                'index': i,
+                'model_name': comp['model_name'],
+                'label':      comp.get('label', comp['model_name']),
+                'params': comp['params'],
+                'bounds': comp['bounds'],
+                'locks':      comp.get('locks', {})
+            })
+            
+        self.builder_window = ModelBuilderWindow(
+            master=self.root,
+            span_request_callback=self.start_span_selector_for_guess,
+            save_callback=self.on_component_saved,
+            clear_callback = self.clear_model,
+            existing=existing
+        )
+
         
     def save_plot(self):
         """Export the current canvas as an image."""

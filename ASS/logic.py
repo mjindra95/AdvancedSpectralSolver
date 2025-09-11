@@ -175,12 +175,6 @@ class Loading:
             header=0,    # the very next line is the column names
             #dtype=str    # parse strings first
         )
-        
-        # print("Shape of loaded dataframe is:")
-        # print("Metadata")
-        # print(metadata)
-        # print(df.shape)
-        # print(df)
 
         return df, metadata
     
@@ -215,12 +209,6 @@ class Loading:
             header=0,    # the very next line is the column names
             #dtype=str    # parse strings first
         )
-        
-        # print("Shape of loaded dataframe is:")
-        # print("Metadata")
-        # print(metadata)
-        # print(df.shape)
-        # print(df)
 
         return df, metadata
     
@@ -321,6 +309,93 @@ class Loading:
                             break
                 if key is None:
                     print(f"⚠️  {base} skipped: no #Distance=… in header")
+                    continue
+    
+            else:
+                raise ValueError(f"Unknown mode {mode!r}")
+    
+            # 4) Avoid duplicate keys
+            if key in df.index:
+                print(f"⚠️  duplicate key {key} in {base}; skipping")
+                continue
+    
+            # 5) Append the intensity row
+            df.loc[key] = intensity
+    
+        # 6) Finalize
+        df.index.name = mode.lower()
+        # print(df)
+        return df.sort_index()
+    
+    def load_witec_1D(directory_path: str, mode: str) -> pd.DataFrame:
+        """
+        Load all .txt spectra in `directory_path`, stacking them into a
+        2D DataFrame whose rows are the scan‐keys (voltage/time/distance)
+        and whose columns are the Raman shifts.
+    
+        Parameters
+        ----------
+        directory_path : str
+            Path to folder containing “*.txt” Horiba files.
+        mode : str
+            One of "SEC", "TIMESCAN", or "LINESCAN" (case‐insensitive).
+    
+        Returns
+        -------
+        df : pd.DataFrame
+            Index = scan keys (float), sorted ascending.
+            Columns = Raman shift values (float), same for every file.
+            Values = intensity (float).
+        """
+    
+        pattern = os.path.join(directory_path, "*.txt")
+        files   = sorted(glob.glob(pattern))
+        if not files:
+            raise ValueError(f"No .txt files in {directory_path!r}")
+    
+        df = None
+        shift_values = None
+        encodings    = ['ansi','utf-8','utf-16','iso-8859-1','windows-1250']
+    
+        for fp in files:
+            # 1) try to load columns 0,1 skipping 40 rows under various encodings
+            data = None
+            for enc in encodings:
+                try:
+                    data = np.loadtxt(fp, usecols=(0,1),
+                                      skiprows=40, encoding=enc)
+                    break
+                except Exception:
+                    continue
+            if data is None:
+                raise ValueError(f"Could not read {fp} with any of {encodings}")
+    
+            shift, intensity = data[:,0], data[:,1]
+    
+            # 2) On the first file, establish the shift‐axis and empty DataFrame
+            if shift_values is None:
+                shift_values = shift.copy()
+                df = pd.DataFrame(
+                    [], 
+                    columns=shift_values.astype(float),
+                    dtype=float
+                )
+            else:
+                # ensure every file has the same shift axis
+                if not np.allclose(shift, shift_values):
+                    print(f'file {fp} has different x axis')
+                    #raise ValueError(f"Shift axis mismatch in file {fp}")
+    
+            # 3) Determine the “key” for this row by mode
+            base = os.path.basename(fp)
+            m   = None
+    
+            if mode.upper() == "SEC":
+                m = re.search(r"([-+]?\d+(?:\.\d+)?)mV", base)
+                if m:
+                    key = float(m.group(1))
+                else:
+                    print(f"⚠️  {base} skipped: no “mV” tag found")
                     continue
     
             else:
@@ -476,7 +551,7 @@ class Processing:
             y += model_dict[model_name]["func"](x, *vals)
         return y
     
-    # @staticmethod
+    # @staticmethod # this function is running 2D map fit on all cores of CPU (fast) but it is not working when the app is wrapped into .exe file anymore...
     # def compute_2d_fit(df_raw, components, lower_shift=None, upper_shift=None):
     #     """
     #     For each pixel (column) in df_raw:
@@ -605,48 +680,6 @@ class Processing:
         return pd.DataFrame.from_records(records)
 
     
-    # @staticmethod
-    # def compute_average(df2d,
-    #                     lower_shift=None, upper_shift=None,
-    #                     lower_x=None,   upper_x=None,
-    #                     lower_y=None,   upper_y=None):
-    #     """
-    #     Take a 2D-map DataFrame whose index is Raman shift (float)
-    #     and whose columns are a MultiIndex (X, Y), and return
-    #     (x, y_avg) where y_avg is the mean over all pixels
-    #     inside the specified shift/X/Y box.
-    #     """
-    #     # 1) restrict shift‐axis
-    #     idx = df2d.index.astype(float)
-    #     lo = idx.min() if lower_shift is None else lower_shift
-    #     hi = idx.max() if upper_shift is None else upper_shift
-    #     clipped = df2d.loc[(idx >= lo) & (idx <= hi)]
-
-    #     if clipped.shape[1] == 0:
-    #         raise ValueError(f"No pixels found for shift ∈ [{lo},{hi}]")
-
-    #     # 2) restrict X/Y coordinates
-    #     cols = clipped.columns  # MultiIndex [(X,Y),…]
-    #     mask = np.ones(len(cols), dtype=bool)
-    #     if lower_x is not None:
-    #         mask &= cols.get_level_values("X") >= lower_x
-    #     if upper_x is not None:
-    #         mask &= cols.get_level_values("X") <= upper_x
-    #     if lower_y is not None:
-    #         mask &= cols.get_level_values("Y") >= lower_y
-    #     if upper_y is not None:
-    #         mask &= cols.get_level_values("Y") <= upper_y
-
-    #     sel = clipped.loc[:, mask]
-    #     if sel.shape[1] == 0:
-    #         raise ValueError(f"No pixels in X×Y ∈ [{lower_x},{upper_x}]×[{lower_y},{upper_y}]")
-
-    #     # 3) average across remaining columns
-    #     x_vals = sel.index.to_numpy()
-    #     y_avg  = sel.mean(axis=1).to_numpy()
-
-    #     return x_vals, y_avg
-    
     @staticmethod
     def compute_average(df2d,
                         lower_shift=None, upper_shift=None,
@@ -725,184 +758,6 @@ class Processing:
         # x_avg = shifts_sel.astype(float).values
 
         return x_avg, y_avg
-    
-    # def compute_1d_fit(df, components, shift_min=None, shift_max=None):
-    #     """
-    #     Fit each spectrum (row) in the given 1D Raman DataFrame with a defined model.
-    
-    #     Parameters
-    #     ----------
-    #     df : pd.DataFrame
-    #         2D Raman map, index = scan coordinate, columns = Raman shift, values = intensity
-    #     components : list of dict
-    #         Model components from the main window
-    #     shift_min : float or None
-    #         Lower Raman shift limit
-    #     shift_max : float or None
-    #         Upper Raman shift limit
-    
-    #     Returns
-    #     -------
-    #     pd.DataFrame
-    #         Fitted parameters for each row, indexed by the scan coordinate
-    #     """
-    
-    #     results = []
-    
-    #     for idx, row in df.iterrows():
-    #         x = df.columns.values.astype(float)
-    #         y = row.values.astype(float)
-    
-    #         # Restrict to fitting window
-    #         mask = np.ones_like(x, dtype=bool)
-    #         if shift_min is not None:
-    #             mask &= x >= shift_min
-    #         if shift_max is not None:
-    #             mask &= x <= shift_max
-    #         x_fit = x[mask]
-    #         y_fit = y[mask]
-    
-    #         if len(x_fit) < 5:
-    #             print(f"⚠️ Not enough points for fitting at index {idx}")
-    #             continue
-    
-    #         # Composite model
-    #         def composite(x, *params):
-    #             i = 0
-    #             y_model = np.zeros_like(x)
-    #             for comp in components:
-    #                 model = comp['model']
-    #                 if model in ('gaussian', 'lorentzian'):
-    #                     amp, ctr, sig = params[i:i+3]
-    #                     if model == 'gaussian':
-    #                         y_model += amp * np.exp(-(x - ctr)**2 / (2 * sig**2))
-    #                     elif model == 'lorentzian':
-    #                         y_model += amp * (0.5*sig)**2 / ((x - ctr)**2 + (0.5*sig)**2)
-    #                     i += 3
-    #             return y_model
-    
-    #         # Initial params and bounds
-    #         p0 = []
-    #         bounds_lower, bounds_upper = [], []
-    #         for comp in components:
-    #             p0.extend([
-    #                 comp['params']['amplitude'],
-    #                 comp['params']['center'],
-    #                 comp['params']['sigma']
-    #             ])
-    #             bounds_lower.extend([
-    #                 comp['bounds']['amplitude'][0],
-    #                 comp['bounds']['center'][0],
-    #                 comp['bounds']['sigma'][0]
-    #             ])
-    #             bounds_upper.extend([
-    #                 comp['bounds']['amplitude'][1],
-    #                 comp['bounds']['center'][1],
-    #                 comp['bounds']['sigma'][1]
-    #             ])
-    
-    #         try:
-    #             popt, _ = curve_fit(composite, x_fit, y_fit, p0=p0, bounds=(bounds_lower, bounds_upper))
-    #             result = {'index': idx}
-    #             for i, comp in enumerate(components):
-    #                 base = i * 3
-    #                 result[f"{comp['label']}_amp"] = popt[base]
-    #                 result[f"{comp['label']}_ctr"] = popt[base+1]
-    #                 result[f"{comp['label']}_sig"] = popt[base+2]
-    #             results.append(result)
-    
-    #         except Exception as e:
-    #             print(f"⚠️ Fit failed at index {idx}: {e}")
-    
-    #     df_result = pd.DataFrame(results)
-    #     df_result.set_index('index', inplace=True)
-    #     df_result.index.name = df.index.name
-    #     return df_result
-
-    # def compute_1d_fit(df, components, model_dict, shift_min=None, shift_max=None):
-    #     """
-    #     Fit each row of 1D Raman data with the user-defined model.
-        
-    #     Parameters
-    #     ----------
-    #     df : pd.DataFrame
-    #         Raman map: index = scan coordinate, columns = Raman shifts, values = intensity
-    #     components : list of dict
-    #         User-defined components from the GUI (with model_name, params, bounds, etc.)
-    #     model_dict : dict
-    #         Dictionary of models and their parametric forms (same as in 2D)
-    #     shift_min, shift_max : float or None
-    #         Raman shift fitting window
-        
-    #     Returns
-    #     -------
-    #     pd.DataFrame
-    #         Fitting results indexed by scan coordinate
-    #     """
-        
-    #     results = []
-    #     x_full = df.columns.values.astype(float)
-    
-    #     # Pre-generate parameter structure
-    #     param_names = []
-    #     def composite_model(x, *params):
-    #         y_fit = np.zeros_like(x)
-    #         i = 0
-    #         for comp in components:
-    #             model = comp["model_name"]
-    #             fn    = model_dict[model]["func"]
-    #             pnames = model_dict[model]["params"]
-    #             n = len(pnames)
-    #             pset = {name: params[i + j] for j, name in enumerate(pnames)}
-    #             y_fit += fn(x, **pset)
-    #             i += n
-    #         return y_fit
-    
-    #     # Prepare p0 and bounds globally (same for every row)
-    #     p0_list, lb_list, ub_list = [], [], []
-    #     for comp in components:
-    #         model = comp["model_name"]
-    #         for pn in model_dict[model]["params"]:
-    #             p0_list.append(comp["params"][pn])
-    #             lo_b, hi_b = comp["bounds"][pn]
-    #             lb_list.append(-np.inf if lo_b is None else lo_b)
-    #             ub_list.append( np.inf if hi_b is None else hi_b)
-    #             param_names.append(f"{comp['label']}_{pn}")
-    #     p0 = np.array(p0_list, dtype=float)
-    #     bounds = (np.array(lb_list, dtype=float), np.array(ub_list, dtype=float))
-    
-    #     for idx, row in df.iterrows():
-    #         y = row.values.astype(float)
-    
-    #         # Apply shift filtering
-    #         mask = np.ones_like(x_full, dtype=bool)
-    #         if shift_min is not None:
-    #             mask &= x_full >= float(shift_min)
-    #         if shift_max is not None:
-    #             mask &= x_full <= float(shift_max)
-    
-    #         x = x_full[mask]
-    #         y = y[mask]
-    
-    #         if len(x) < len(p0):
-    #             print(f"⚠️ Not enough points to fit at {idx}")
-    #             continue
-    
-    #         try:
-    #             popt, _ = curve_fit(composite_model, x, y, p0=p0, bounds=bounds)
-    #             result = dict(zip(param_names, popt))
-    #             result["index"] = idx
-    #             results.append(result)
-    #         except Exception as e:
-    #             print(f"⚠️ Fit failed at {idx}: {e}")
-    #             continue
-    
-    #     df_result = pd.DataFrame(results)
-    #     if not df_result.empty:
-    #         df_result.set_index("index", inplace=True)
-    #         df_result.index.name = df.index.name
-    
-    #     return df_result
     
     @staticmethod
     def compute_1d_fit(df_raw, components, lower_shift=None, upper_shift=None):

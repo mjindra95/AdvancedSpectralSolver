@@ -161,6 +161,21 @@ class ModelBuilderWindow(tk.Toplevel):
                 default = f"{blk.func_var.get()}_{i}"
                 blk.label_var.set(default)
                 
+    # def update_parameters_from_main(self, updated_components):
+    #     """
+    #     Called from the main GUI to refresh the displayed parameters.
+    #     """
+    #     print("Updating model builder window 1")
+
+    #     # Remove existing blocks
+    #     for block in list(self.function_blocks):
+    #         block.frame.destroy()
+    #     self.function_blocks.clear()
+
+    #     # Rebuild blocks from updated component list
+    #     for comp in updated_components:
+    #         self._add_function_block(prefill=comp)
+                
     def _on_state(self):
         if self.model_state == True:
             self.model_state == False

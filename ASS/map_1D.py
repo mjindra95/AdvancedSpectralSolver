@@ -240,7 +240,16 @@ class Map_1D(tk.Toplevel):
     def witec_load(self):
         mod = self.mode_var.get()
         if mod == 'SEC':
-            messagebox.showinfo("Load", "Would load Witec SEC data here.")
+            # directory_path = File_utils.ask_directory()
+            self.directory_path = filedialog.askdirectory(parent = self , title = "Choose directory...")
+            if not self.directory_path:
+                return
+            self.df = Loading.load_horiba_1D(self.directory_path, mod)
+            self.lower_shift_var.set(self.df.columns.min())
+            self.upper_shift_var.set(self.df.columns.max())
+            self.lower_idx_var.set(self.df.index.min())
+            self.upper_idx_var.set(self.df.index.max())
+            messagebox.showinfo("Load", "Data were loaded succesfully", parent = self)
         elif mod == 'Linescan':
             messagebox.showinfo("Load", "Would load Witec Linescan data here.")
         elif mod == 'Timescan':
