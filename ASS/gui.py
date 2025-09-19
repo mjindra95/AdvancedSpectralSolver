@@ -58,9 +58,15 @@ class MainWindow:
         self._create_plot()
         self._bind_shortcuts()
         self.zoom_enabled = False
+        self.batch_xlim = None
         self.rectangle_selector = None
         self.filtered_data = None
         self.active_filter = None
+        self.compare_data = None
+        self.compare_trigger = False
+        
+        self.filename = None
+        self.compare_filename = None
         
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
@@ -111,6 +117,8 @@ class MainWindow:
         
         spectrum_menu = tk.Menu(menubar, tearoff=0)
         spectrum_menu.add_command(label="Compare spectrum", command=self.compare_spectrum)
+        spectrum_menu.add_command(label="Disable compare", command=self.disable_compare)
+        spectrum_menu.add_separator()
         spectrum_menu.add_command(label="Spectrum operation", command=self.spectrum_operation)
         spectrum_menu.add_command(label="Save spectrum (data)", command = self.save_spectrum)
         spectrum_menu.add_command(label="Save spectrum (plot)", command = self.save_plot)
@@ -245,24 +253,35 @@ class MainWindow:
         if not path:
             return
         try:
-            self.x_data, self.y_data, filename = Loading.load_horiba(path)
-            self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
-            self.display_data = self.raw_data.copy()
-            self.filtered_data = None
-            if getattr(self, "active_filter", None) is not None:
-                func_name, fparams = self.active_filter
-                x_slice = self.display_data["X"].values
-                y_slice = self.display_data["Y"].values
-                try:
-                    y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
-                    self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
-                except Exception as fe:
-                    messagebox.showwarning(
-                        "Filter Warning",
-                        f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
-                        "Showing unfiltered data instead."
-                    )
-                    self.filtered_data = None
+            if self.compare_trigger == True:
+                self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_horiba(path)
+                self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
+                self.compare_data = self.compare_data_raw.copy()
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
+                    self.compare_data = self.compare_data.loc[mask].reset_index(drop=True)
+                self.compare_trigger = False
+            else:
+                self.x_data, self.y_data, self.filename = Loading.load_horiba(path)
+                self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
+                self.display_data = self.raw_data.copy()
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.display_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
             self.update_composite_plot()
             self.canvas.draw()
         except Exception as e:
@@ -274,24 +293,35 @@ class MainWindow:
         if not path:
             return
         try:
-            self.x_data, self.y_data, filename = Loading.load_witec(path)
-            self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
-            self.display_data = self.raw_data.copy()
-            self.filtered_data = None
-            if getattr(self, "active_filter", None) is not None:
-                func_name, fparams = self.active_filter
-                x_slice = self.display_data["X"].values
-                y_slice = self.display_data["Y"].values
-                try:
-                    y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
-                    self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
-                except Exception as fe:
-                    messagebox.showwarning(
-                        "Filter Warning",
-                        f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
-                        "Showing unfiltered data instead."
-                    )
-                    self.filtered_data = None
+            if self.compare_trigger == True:
+                self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_witec(path)
+                self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
+                self.compare_data = self.compare_data_raw.copy()
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
+                    self.compare_data = self.compare_data.loc[mask].reset_index(drop=True)
+                self.compare_trigger = False
+            else:
+                self.x_data, self.y_data, self.filename = Loading.load_witec(path)
+                self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
+                self.display_data = self.raw_data.copy()
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.display_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
             self.update_composite_plot()
             # Plotting.plot_data(self.ax, self.display_data, label=filename)
             self.canvas.draw()
@@ -304,24 +334,35 @@ class MainWindow:
         if not path:
             return
         try:
-            self.x_data, self.y_data, filename = Loading.load_default(path)
-            self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
-            self.display_data = self.raw_data.copy()
-            self.filtered_data = None
-            if getattr(self, "active_filter", None) is not None:
-                func_name, fparams = self.active_filter
-                x_slice = self.display_data["X"].values
-                y_slice = self.display_data["Y"].values
-                try:
-                    y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
-                    self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
-                except Exception as fe:
-                    messagebox.showwarning(
-                        "Filter Warning",
-                        f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
-                        "Showing unfiltered data instead."
-                    )
-                    self.filtered_data = None
+            if self.compare_trigger == True:
+                self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_default(path)
+                self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
+                self.compare_data = self.compare_data_raw.copy()
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
+                    self.compare_data = self.compare_data.loc[mask].reset_index(drop=True)
+                self.compare_trigger = False
+            else:
+                self.x_data, self.y_data, self.filename = Loading.load_default(path)
+                self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
+                self.display_data = self.raw_data.copy()
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.display_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
             self.update_composite_plot()
             #Plotting.plot_data(self.ax, self.display_data, label=filename)
             self.canvas.draw()
@@ -383,6 +424,9 @@ class MainWindow:
         # 1) Zoom the displayed raw data
         mask = (self.display_data['X'] >= xmin) & (self.display_data['X'] <= xmax)
         self.display_data = self.display_data.loc[mask].reset_index(drop=True)
+        if self.compare_data is not None:
+            compare_mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
+            self.compare_data = self.compare_data.loc[compare_mask].reset_index(drop=True)
     
         # 2) If a filter is active, re‐apply it to the *new* display_data
         if getattr(self, "active_filter", None) is not None:
@@ -412,6 +456,7 @@ class MainWindow:
 
     def reset_zoom(self):
         self.display_data = self.raw_data.copy()
+        self.compare_data = self.compare_data_raw.copy()
         if getattr(self, "active_filter", None) is not None:
             func_name, fparams = self.active_filter
             xz = self.display_data["X"].values
@@ -558,7 +603,7 @@ class MainWindow:
         self.update_composite_plot()
         
     def update_composite_plot(self):
-        Plotting.update_plot(self.fig, self.display_data, self.components, self.filtered_data)
+        Plotting.update_plot(self.fig, self.display_data, self.filename, self.components, self.filtered_data, self.compare_data, self.compare_filename)
         # rebind the left-axis in case update_plot re-created it
         self.ax = self.fig.axes[0]
         self.canvas.draw()
@@ -1342,7 +1387,41 @@ class MainWindow:
         ExcelPlotWindow(self.root)
         
     def compare_spectrum(self):
-        messagebox.showinfo("Compare spectrum", "Compare spectrum will be added")
+        #messagebox.showinfo("Compare spectrum", "Compare spectrum will be added")
+        self.compare_trigger = True
+        print("Trigger set to True")
+        """Popup a small window with Load Horiba / Load Witec buttons."""
+        win = tk.Toplevel(self.root)
+        win.title("Load Data")
+        win.geometry("240x120")
+        win.transient(self.root)
+        win.grab_set()   # make it modal
+
+        ttk.Button(
+            win,
+            text="Load Horiba",
+            command=lambda: (win.destroy(), self.load_horiba_data())
+        ).pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(
+            win,
+            text="Load Witec",
+            command=lambda: (win.destroy(), self.load_witec_data())
+        ).pack(fill=tk.X, padx=10, pady=5)
+        
+        ttk.Button(
+            win,
+            text="Load default",
+            command=lambda: (win.destroy(), self.load_default_data())
+        ).pack(fill=tk.X, padx=10, pady=5)
+        
+    def disable_compare(self):
+        # self.compare_data_raw = None
+        self.compare_data = None
+        self.compare_filename = None
+        
+        self.update_composite_plot()
+        self.canvas.draw()
         
     def spectrum_operation(self):
         messagebox.showinfo("Spectrum calculation", "Spectrum calculation will be added")

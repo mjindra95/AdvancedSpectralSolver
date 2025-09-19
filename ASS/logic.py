@@ -829,8 +829,8 @@ class Processing:
 class Plotting:
     def __init__(self, data):
         self.data = data
-    
-    def update_plot(fig, data, components, filtered_data):
+           
+    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename):
 
         fig.clear()
 
@@ -878,10 +878,14 @@ class Plotting:
                             ax_bott_right.plot(x_dense, y_comp, '--', label=label, alpha=0.8)
             ax_bott_right.set_ylabel('Intensity (arb. u.)')
             if filtered_data is not None:
-                ax_bott_left.plot(x, y, linestyle = 'dotted', color='black', label='Data (raw)')
-                ax_bott_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label='Filtered data')
+                ax_bott_left.plot(x, y, linestyle = 'dotted', color='black', label=f'{filename} (raw)')
+                ax_bott_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=f'{filename} filtered')
             else:
-                ax_bott_left.scatter(x, y, s=5, color='blue', label='Data (raw)')
+                ax_bott_left.scatter(x, y, s=5, color='blue', label=f'{filename} (raw)')
+                
+            if compare_data is not None:
+                ax_bott_left.plot(compare_data["X"].values, compare_data["Y"].values, color='green', label=f'{compare_filename} (raw)')
+            
             ax_bott_left.plot(x_dense, composite, '-', color='red', label='Composite')
             
             if y.max() > composite.max():
@@ -916,10 +920,12 @@ class Plotting:
         else:
             ax_left  = fig.add_subplot(111)
             if filtered_data is not None:
-                ax_left.plot(x, y, linestyle = 'dotted', color = 'black', label='Raw data')
-                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label='Filtered data')
+                ax_left.plot(x, y, linestyle = 'dotted', color = 'black', label=f'{filename} (raw)')
+                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=f'{filename} filtered')
             else:
-                ax_left.plot(x, y, color = 'blue', label='Raw data')
+                ax_left.plot(x, y, color = 'blue', label=f'{filename} (raw)')
+            if compare_data is not None:
+                ax_left.plot(compare_data["X"].values, compare_data["Y"].values, color='green', label=f'{compare_filename} (raw)')
             ax_left.legend(loc='best')
             ax_left.set_xlabel(r'Raman shift (cm$^{-1}$)')
             ax_left.set_ylabel('Intensity (arb. u.)')
