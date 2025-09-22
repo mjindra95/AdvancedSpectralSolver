@@ -175,6 +175,8 @@ class Loading:
             header=0,    # the very next line is the column names
             #dtype=str    # parse strings first
         )
+        
+        print(df)
 
         return df, metadata
     
@@ -211,6 +213,149 @@ class Loading:
         )
 
         return df, metadata
+    
+    # def load_horiba_split_2D(folder):
+    #     pattern = os.path.join(folder, "*.txt")
+    #     files = sorted(glob.glob(pattern))
+    #     if not files:
+    #         raise ValueError(f'No .txt files in {folder}')
+            
+    #     df_raw = None
+    #     encodings    = ['ansi','utf-8','utf-16','iso-8859-1','windows-1250']
+    #     correct_encoding = None
+    #     for file in files:
+    #         try:
+    #             if correct_encoding is None:
+    #                 for enc in encodings:
+    #                     shift, intensity = np.loadtxt(file, usecols=(0,1), comment='#', encoding=enc)
+    #                     correct_encoding = enc
+    #                     break
+    #             else:
+    #                 shift, intensity = np.loadtxt(file, usecols=(0,1), comment = '#', encoding = correct_encoding)
+    #         except:
+    #             print(f"File {file} did not load")
+    #             break
+            
+    #         X, Y = Processing.extract_Horiba_coordinates(file)
+    #         if df_raw is None:
+    #             print(F"File {X}/{Y} will be loaded")
+    #             # append shift (name shift) as 1st column and intensity (name will contain info about X and Y cooridate) as 2nd column
+    #         else:
+    #             print(f"File {X}/{Y} will be loaded")
+    #             # check that shift is the same as 1st column of df_raw
+    #             # append intensity as the last column of the df_raw (name of the column will contain info about X and Y coordinates)
+        
+    
+    # def load_horiba_split_2D(folder):
+    #     pattern = os.path.join(folder, "*.txt")
+    #     files = sorted(glob.glob(pattern))
+    #     if not files:
+    #         raise ValueError(f'No .txt files in {folder}')
+    
+    #     df_raw = None
+    #     encodings = ['ansi', 'utf-8', 'utf-16', 'iso-8859-1', 'windows-1250']
+    #     correct_encoding = None
+    
+    #     for file in files:
+    #         # --- try encodings until one works ---
+    #         if correct_encoding is None:
+    #             for enc in encodings:
+    #                 try:
+    #                     shift, intensity = np.loadtxt(
+    #                         file, usecols=(0, 1), comments='#', encoding=enc, unpack=True
+    #                     )
+    #                     correct_encoding = enc
+    #                     break
+    #                 except Exception:
+    #                     continue
+    #             if correct_encoding is None:
+    #                 print(f"File {file} could not be decoded with given encodings")
+    #                 continue
+    #         else:
+    #             try:
+    #                 shift, intensity = np.loadtxt(
+    #                     file, usecols=(0, 1), comments='#', encoding=correct_encoding, unpack=True
+    #                 )
+    #             except Exception:
+    #                 print(f"File {file} failed to load with {correct_encoding}")
+    #                 continue
+    
+    #         # --- extract coordinates ---
+    #         X, Y = Processing.extract_Horiba_coordinates(file)  # your function
+    
+    #         # --- build dataframe ---
+    #         if df_raw is None:
+    #             print(f"File {X}/{Y} will be loaded (first)")
+    #             df_raw = pd.DataFrame({"shift": shift, f"I({X}/{Y})": intensity})
+    #         else:
+    #             print(f"File {X}/{Y} will be loaded")
+    #             # check shift consistency
+    #             if not np.allclose(df_raw["shift"].values, shift, atol=1e-6):
+    #                 raise ValueError(f"Shift axis in {file} does not match reference")
+    #             df_raw[f"I({X},{Y})"] = intensity
+    
+    #     return df_raw
+
+    def load_horiba_split_2D(folder):
+        pattern = os.path.join(folder, "*.txt")
+        files = sorted(glob.glob(pattern))
+        if not files:
+            raise ValueError(f'No .txt files in {folder}')
+    
+        encodings = ['ansi', 'utf-8', 'utf-16', 'iso-8859-1', 'windows-1250']
+        correct_encoding = None
+    
+        shifts = None
+        spectra = []  # collect all spectra here
+    
+        for file in files:
+            # --- find encoding if not already detected ---
+            if correct_encoding is None:
+                for enc in encodings:
+                    try:
+                        shift, intensity = np.loadtxt(
+                            file, usecols=(0, 1), comments="#",
+                            encoding=enc, unpack=True
+                        )
+                        correct_encoding = enc
+                        break
+                    except Exception:
+                        continue
+                if correct_encoding is None:
+                    print(f"File {file} could not be decoded with given encodings")
+                    continue
+            else:
+                try:
+                    shift, intensity = np.loadtxt(
+                        file, usecols=(0, 1), comments="#",
+                        encoding=correct_encoding, unpack=True
+                    )
+                except Exception:
+                    print(f"File {file} failed to load with {correct_encoding}")
+                    continue
+    
+            # --- extract coordinates ---
+            X, Y = Processing.extract_Horiba_coordinates(file)
+    
+            # --- check shifts ---
+            if shifts is None:
+                shifts = shift
+            elif not np.allclose(shifts, shift, atol=1e-6):
+                raise ValueError(f"Shift axis in {file} does not match reference")
+    
+            # --- collect as Series ---
+            spectra.append(pd.Series(intensity, name=f"I({X}/{Y})"))
+    
+        # --- build dataframe in one shot ---
+        if not spectra:
+            raise ValueError("No spectra loaded successfully")
+    
+        df_raw = pd.concat([pd.Series(shifts, name="X-Axis")] + spectra, axis=1)
+        
+        print(df_raw)
+    
+        return df_raw
+
     
     def load_horiba_1D(directory_path: str, mode: str) -> pd.DataFrame:
         """
@@ -462,6 +607,18 @@ class Processing:
             corY = int(match.group(2))
             return corX, corY
         else:
+            return None, None
+        
+    def extract_Horiba_coordinates(filename):
+        # print(filename)
+        basename = os.path.basename(filename)
+        print(basename)
+        match = re.match(r'YA(\d+)_XA(\d+)\.txt', basename)
+        if match:
+            Y_coordinate, X_coordinate = map(int, match.groups())
+            return Y_coordinate, X_coordinate
+        else:
+            print(f"Warning: Unable to extract coordinates from {filename}")
             return None, None
 
     

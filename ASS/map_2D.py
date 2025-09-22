@@ -36,7 +36,7 @@ class Map_2D(tk.Toplevel):
         self.rowconfigure(0, weight=1)
 
         # --- VARIABLES ---
-        self.source_var     = tk.StringVar(value="Witec")
+        self.source_var     = tk.StringVar(value="Witec file")
         self.lower_shift    = tk.StringVar()
         self.upper_shift    = tk.StringVar()
         self.lower_x        = tk.StringVar()
@@ -87,7 +87,7 @@ class Map_2D(tk.Toplevel):
         # Source + Load
         ttk.Label(right, text="Source:").grid(row=row, column=0, sticky="w")
         ttk.Combobox(right, textvariable=self.source_var,
-                     values=["Witec","Horiba"], state="readonly")\
+                     values=["Witec file","Horiba split", "Horiba file"], state="readonly")\
            .grid(row=row+1, column=0, sticky="ew", pady=(0,10))
         row = row+1
         ttk.Button(right, text="Load", command=self._on_load)\
@@ -224,7 +224,7 @@ class Map_2D(tk.Toplevel):
     def _on_load(self):
         source = self.source_var.get()
         
-        if source == "Witec":
+        if source == "Witec file":
             path = filedialog.askopenfilename(
                 parent=self,
                 title="Load WITec 2D map",
@@ -255,6 +255,28 @@ class Map_2D(tk.Toplevel):
                 f"ScanWidth={meta.get('ScanWidth')} ScanHeight={meta.get('ScanHeight')}",
                 parent=self
             )
+            
+        elif source == "Horiba split":
+            folder = filedialog.askdirectory(parent = self, title="Select folder with .txt split spectra")
+            if not folder:
+                return
+            try:
+                df_raw = Loading.load_horiba_split_2D(folder)
+                # messagebox.showinfo("Load info", "loading of horiba split map", parent = self)
+            except Exception as e:
+                messagebox.showerror("Load error", str(e), parent = self)
+                
+            self.df2d = df_raw
+            self.map_meta   = None
+            
+            shift_low = self.df2d['X-Axis'].iloc[0]
+            shift_high = self.df2d['X-Axis'].iloc[-1]
+            
+            self.lower_shift.set(shift_low)
+            self.upper_shift.set(shift_high)
+            
+            messagebox.showinfo("Loaded",
+                f"Map loaded ({df_raw.shape[0]-1} wavenumbers × {len(df_raw.columns)} spectra)\n", parent=self)
 
     def _on_plot(self):
         if self.df2d is None:
@@ -531,6 +553,8 @@ class Map_2D(tk.Toplevel):
         except Exception as e:
             messagebox.showerror("Fit Error", f"2D fitting failed:\n{e}", parent=self)
             return
+        print("Fit df:")
+        print(self.fit_df)
 
         # now enable & populate the controls:
         params = [c for c in self.fit_df.columns if c not in ("X","Y")]
@@ -593,9 +617,31 @@ class Map_2D(tk.Toplevel):
         self.ax = new_ax
         self.canvas.draw()
         
+    # def _on_save_fit(self):
+    #     # 1) Make sure we actually have fit data
+    #     if not getattr(self, "fit_df", None) or self.fit_df.empty:
+    #         messagebox.showwarning("No data", "Fit map first", parent=self)
+    #         return
+    
+    #     # 2) Ask the user for a filename (including path)
+    #     path = filedialog.asksaveasfilename(
+    #         title="Save fit results as…",
+    #         defaultextension=".xlsx",
+    #         filetypes=[("Excel file", "*.xlsx"), ("All files", "*.*")]
+    #     )
+    #     if not path:
+    #         return  # user cancelled
+    
+    #     # 3) Write the DataFrame to that exact file
+    #     try:
+    #         self.fit_df.to_excel(path, index=False)
+    #         messagebox.showinfo("Saved", f"Fit results saved to:\n{path}", parent=self)
+    #     except Exception as e:
+    #         messagebox.showerror("Error", f"Could not save fit results:\n{e}", parent=self)
+    
     def _on_save_fit(self):
         # 1) Make sure we actually have fit data
-        if not getattr(self, "fit_df", None) or self.fit_df.empty:
+        if not hasattr(self, "fit_df") or self.fit_df is None or self.fit_df.empty:
             messagebox.showwarning("No data", "Fit map first", parent=self)
             return
     

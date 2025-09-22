@@ -159,6 +159,7 @@ class MainWindow:
         about_menu = tk.Menu(menubar, tearoff=0)
         about_menu.add_command(label="About", command=self.show_about)
         about_menu.add_command(label="Help", command=self.show_help)
+        about_menu.add_command(label="Report bug", command=self.report_bug)
         menubar.add_cascade(label="About", menu=about_menu)
 
         self.root.config(menu=menubar)
@@ -405,7 +406,7 @@ class MainWindow:
 
         ttk.Button(
             win,
-            text="User defined format",
+            text="Load user defined format",
             command=lambda: (win.destroy(), self.load_user_data())
         ).pack(fill=tk.X, padx=10, pady=5)
 
@@ -1059,8 +1060,10 @@ class MainWindow:
         
             # 5) Write both sheets into one Excel file
             with pd.ExcelWriter(path, engine="openpyxl") as writer:
-                df_raw.to_excel(writer, sheet_name="Raw data", index=False)
-                df_model.to_excel(writer, sheet_name="Model & Components", index=False)
+                # df_raw.to_excel(writer, sheet_name="Raw data", index=False)
+                # df_model.to_excel(writer, sheet_name="Model & Components", index=False)
+                df_all = pd.concat([df_raw, df_model], axis = 1)
+                df_all.to_excel(writer, sheet_name = "All_data", index = False)
         
             messagebox.showinfo("Saved", f"Displayed data saved to:\n{path}")
         
@@ -1415,36 +1418,6 @@ class MainWindow:
         self.compare_trigger = True
         print("Trigger set to True")
         self.open_load_window()
-        # win = tk.Toplevel(self.root)
-        # win.title("Load Data")
-        # win.geometry("240x150")
-        # win.transient(self.root)
-        # win.grab_set()   # make it modal
-
-        # ttk.Button(
-        #     win,
-        #     text="Load Horiba",
-        #     command=lambda: (win.destroy(), self.load_horiba_data())
-        # ).pack(fill=tk.X, padx=10, pady=5)
-
-        # ttk.Button(
-        #     win,
-        #     text="Load Witec",
-        #     command=lambda: (win.destroy(), self.load_witec_data())
-        # ).pack(fill=tk.X, padx=10, pady=5)
-        
-        # ttk.Button(
-        #     win,
-        #     text="Load default",
-        #     command=lambda: (win.destroy(), self.load_default_data())
-        # ).pack(fill=tk.X, padx=10, pady=5)
-        
-        # ttk.Button(
-        #     win,
-        #     text="User defined format",
-        #     command=lambda: (win.destroy(), self.load_default_data())
-        # ).pack(fill=tk.X, padx=10, pady=5)
-
         
     def disable_compare(self):
         # self.compare_data_raw = None
@@ -1457,6 +1430,9 @@ class MainWindow:
         
     def spectrum_operation(self):
         messagebox.showinfo("Spectrum oparation", "Mathematical operations with the spectrum will be added")
+        
+    def report_bug(self):
+        messagebox.showinfo("Report bug", "If you will find some error, you can report it at the Github repository (https://github.com/mjindra95/AdvancedSpectralSolver) or write email to martin.jindra97@gmail.com")
 
     def run(self):
         self.root.mainloop()
