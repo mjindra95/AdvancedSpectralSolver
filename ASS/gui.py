@@ -89,12 +89,6 @@ class MainWindow:
             dpi = self.fig.get_dpi()
             self.fig.set_size_inches(w / dpi, h / dpi)
             self.canvas.draw()
-        
-    # def _resize_plot(self, event):
-    #     """Resize the matplotlib figure when the plot panel changes size."""
-    #     if event.width > 50 and event.height > 50:  # avoid tiny startup events
-    #         self.fig.set_size_inches(event.width / 300, event.height / 300)
-    #         self.canvas.draw()
 
     def on_close(self):
         self.root.quit()
@@ -109,14 +103,6 @@ class MainWindow:
         file_menu.add_command(label="Load Witec spectrum", command=self.load_witec_data, accelerator="Ctrl+w")
         file_menu.add_command(label="Load default spectrum", command=self.load_default_data, accelerator="Ctrl+d")
         file_menu.add_command(label="Load user spectrum", command=self.load_user_data, accelerator="Ctrl+u")
-        # file_menu.add_separator()
-        # file_menu.add_command(label="Save Plot",    command=self.save_plot,    accelerator="Ctrl+p")
-        # file_menu.add_command(label="Save Report",  command=self.save_report,  accelerator="Ctrl+r")
-        # file_menu.add_command(label="Save Both",    command=self.save_both,    accelerator="Ctrl+e")
-        # file_menu.add_command(label="Save data", command = self.save_data)
-        # file_menu.add_command(label="Save spectrum", command = self.save_spectrum)
-        # file_menu.add_separator()
-        # file_menu.add_command(label="Compare plot", command=self.show_compare)
         menubar.add_cascade(label="File", menu=file_menu)
         
         spectrum_menu = tk.Menu(menubar, tearoff=0)
@@ -145,8 +131,6 @@ class MainWindow:
         menubar.add_cascade(label="Model", menu=model_menu)
 
         advanced_menu = tk.Menu(menubar, tearoff=0)
-        # advanced_menu.add_command(label="Batch Fit", command=self.batch_fit)
-        # advanced_menu.add_separator()
         advanced_menu.add_command(label="Filtering", command=self.open_filter_window)
         advanced_menu.add_separator()
         advanced_menu.add_command(label="Batch analysis", command=self.batch_fit)
@@ -186,21 +170,15 @@ class MainWindow:
         self.info_label.pack(fill=tk.X, pady=(10, 2))
         self.sep = ttk.Separator(self.left_panel, orient="horizontal")
         self.sep.pack(fill=tk.X, pady=(5, 5))
-        # self.info_label = ttk.Label(self.left_panel, text="---Load data---", anchor = "center")
-        # self.info_label.pack(fill=tk.X, pady=(10, 2))
         self.load_button = ttk.Button(self.left_panel, text="Load", command=self.open_load_window)
         self.load_button.pack(fill=tk.X, pady=5)
         self.sep = ttk.Separator(self.left_panel, orient="horizontal")
         self.sep.pack(fill=tk.X, pady=(5, 5))
-        # self.info_label = ttk.Label(self.left_panel, text="---Zoom in---", anchor = "center")
-        # self.info_label.pack(fill=tk.X, pady=(10, 2))
         self.zoom_button = ttk.Button(self.left_panel, text="Zoom", command=self.toggle_zoom)
         self.zoom_button.pack(fill=tk.X, pady=5)
         ttk.Button(self.left_panel, text="Reset Zoom", command=self.reset_zoom).pack(fill=tk.X, pady=5)
         self.sep = ttk.Separator(self.left_panel, orient="horizontal")
         self.sep.pack(fill=tk.X, pady=(5, 5))
-        # self.info_label = ttk.Label(self.left_panel, text="---Model---", anchor = "center")
-        # self.info_label.pack(fill=tk.X, pady=(10, 2))
         ttk.Button(self.left_panel, text="Built/Edit Model", command=self.open_model_builder).pack(fill=tk.X, pady=5)
         ttk.Button(self.left_panel, text="Optimize Model", command=self.optimize_model).pack(fill=tk.X, pady=5)
 
@@ -513,19 +491,7 @@ class MainWindow:
             clear_callback = self.clear_model,
             existing=existing
         )
-        
-        # if not hasattr(self, "model_builder_window") or not self.builder_window.winfo_exists():
-        #     self.builder_window = ModelBuilderWindow(
-        #         master=self.root,
-        #         span_request_callback=self.start_span_selector_for_guess,
-        #         save_callback=self.on_component_saved,
-        #         clear_callback=self.clear_model,
-        #         existing=self.components
-        #     )
-        # else:
-        #     self.builder_window.lift()  # Bring it to front if already open
-
-            
+           
     def request_span_selection(self, callback):
         if self.span_request_delegate:
             self.grab_release()  # Let the main window get mouse input
@@ -547,11 +513,6 @@ class MainWindow:
             mask   = (self.display_data['X'] >= xmin) & (self.display_data['X'] <= xmax)
             x_sel  = self.display_data['X'][mask].values
             y_sel  = self.display_data['Y'][mask].values
-            
-            # sel = self.display_data[(self.display_data["X"] >= xmin)
-            #            & (self.display_data["X"] <= xmax)]
-            # x_sel = sel["X"].to_numpy()
-            # y_sel = sel["Y"].to_numpy()
 
             # --- new: compute the composite model over x_sel ---
             comp = np.zeros_like(x_sel)
@@ -768,12 +729,6 @@ class MainWindow:
             'covariance':    pcov.tolist(),
             'correlation':   corr.tolist()
         }
-        
-        # print("Updating model builder window 2")
-        
-        # # 6) Notify model builder if it's open
-        # if hasattr(self, "model_builder_window") and self.builder_window.winfo_exists():
-        #     self.builder_window.update_parameters_from_main(self.components)
             
         # print("Updating model builder window 3")
         self.builder_window.destroy()
@@ -1330,7 +1285,6 @@ class MainWindow:
         except Exception as e:
             messagebox.showerror("Filter Error", f"Could not apply filter:\n{e}")
 
-
     def disable_filter(self):
         """
         Called by FilterWindow “Disable.” Remove any filter and redraw.
@@ -1341,9 +1295,6 @@ class MainWindow:
 
     def map_2D(self):
         Map_2D(self, plot_callback=self.plot_pixel_spectrum)
-        # map_2D_window = Map_2D(self.root, plot_callback=self.plot_pixel_spectrum)
-        # map_2D_window.transient(self.root)
-        # map_2D_window.grab_set()
     
     def plot_pixel_spectrum(self, x, y, label=None):
         # 1) pack the x/y into a DataFrame exactly the way load_data does
@@ -1374,10 +1325,6 @@ class MainWindow:
     
         # 5) finally, push it onto the canvas
         self.canvas.draw()
-        
-    # def map_1D(self):
-    #     # Open the Map_1D window on top of the main window
-    #     Map_1D(self.root)
     
     def map_1D(self):
         Map_1D(self, plot_callback=self.plot_index_spectrum)

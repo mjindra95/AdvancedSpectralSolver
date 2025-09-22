@@ -282,11 +282,6 @@ class Map_2D(tk.Toplevel):
         if self.df2d is None:
             messagebox.showwarning("No data", "Load a map first", parent=self)
             return
-            
-        # available_X = self.df2d.columns.get_level_values("X").unique()
-        # available_Y = self.df2d.columns.get_level_values("Y").unique()
-        # print("X runs from", available_X.min(), "to", available_X.max())
-        # print("Y runs from", available_Y.min(), "to", available_Y.max())
 
         # 1) gather bounds & options
         ls = self.lower_shift.get().strip()
@@ -572,17 +567,7 @@ class Map_2D(tk.Toplevel):
         if self.fit_df is None:
             messagebox.showwarning("No data", "Fit map first", parent=self)
             return
-            
-        # available_X = self.df2d.columns.get_level_values("X").unique()
-        # available_Y = self.df2d.columns.get_level_values("Y").unique()
-        # print("X runs from", available_X.min(), "to", available_X.max())
-        # print("Y runs from", available_Y.min(), "to", available_Y.max())
-
-        # 1) gather bounds & options
-        # ls = self.lower_shift.get().strip()
-        # lower_shift = float(ls) if ls else None
-        # us = self.upper_shift.get().strip()
-        # upper_shift = float(us) if us else None
+        
         lx = self.lower_x.get().strip()
         lower_x = float(lx) if lx else None
         ux = self.upper_x.get().strip()
@@ -616,28 +601,6 @@ class Map_2D(tk.Toplevel):
         # 4) redraw
         self.ax = new_ax
         self.canvas.draw()
-        
-    # def _on_save_fit(self):
-    #     # 1) Make sure we actually have fit data
-    #     if not getattr(self, "fit_df", None) or self.fit_df.empty:
-    #         messagebox.showwarning("No data", "Fit map first", parent=self)
-    #         return
-    
-    #     # 2) Ask the user for a filename (including path)
-    #     path = filedialog.asksaveasfilename(
-    #         title="Save fit results as…",
-    #         defaultextension=".xlsx",
-    #         filetypes=[("Excel file", "*.xlsx"), ("All files", "*.*")]
-    #     )
-    #     if not path:
-    #         return  # user cancelled
-    
-    #     # 3) Write the DataFrame to that exact file
-    #     try:
-    #         self.fit_df.to_excel(path, index=False)
-    #         messagebox.showinfo("Saved", f"Fit results saved to:\n{path}", parent=self)
-    #     except Exception as e:
-    #         messagebox.showerror("Error", f"Could not save fit results:\n{e}", parent=self)
     
     def _on_save_fit(self):
         # 1) Make sure we actually have fit data

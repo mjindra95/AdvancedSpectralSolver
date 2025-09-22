@@ -22,52 +22,6 @@ class ExcelPlotWindow:
         self.df = None
         self._create_widgets()
 
-    # def _create_widgets(self):
-    #     # Left panel
-    #     self.left_panel = tk.Frame(self.window, width=300, padx=10, pady=10)
-    #     self.left_panel.pack(side=tk.LEFT, fill=tk.Y)
-
-    #     # Load button
-    #     self.load_button = tk.Button(self.left_panel, text="Load Excel File", command=self._load_excel)
-    #     self.load_button.pack(pady=(0, 10))
-
-    #     # X selection
-    #     self.x_label = tk.Label(self.left_panel, text="X Column:")
-    #     self.x_label.pack()
-    #     self.x_combo = ttk.Combobox(self.left_panel, state='disabled')
-    #     self.x_combo.pack(fill=tk.X, pady=(0, 10))
-
-    #     self.x_axis_label = tk.Entry(self.left_panel)
-    #     self.x_axis_label.insert(0, "")  # empty by default
-    #     self.x_axis_label.pack(fill=tk.X, pady=(0, 10))
-    #     self.x_axis_label.config(state='disabled')
-
-    #     # Y selection
-    #     self.y_label = tk.Label(self.left_panel, text="Y Column:")
-    #     self.y_label.pack()
-    #     self.y_combo = ttk.Combobox(self.left_panel, state='disabled')
-    #     self.y_combo.pack(fill=tk.X, pady=(0, 10))
-
-    #     self.y_axis_label = tk.Entry(self.left_panel)
-    #     self.y_axis_label.insert(0, "")
-    #     self.y_axis_label.pack(fill=tk.X, pady=(0, 10))
-    #     self.y_axis_label.config(state='disabled')
-
-    #     # Plot button
-    #     self.plot_button = tk.Button(self.left_panel, text="Plot", state='disabled', command=self._plot_data)
-    #     self.plot_button.pack(pady=(10, 10))
-
-    #     # Save button
-    #     self.save_button = tk.Button(self.left_panel, text="Save as PNG", state='disabled', command=self._save_plot)
-    #     self.save_button.pack(pady=(0, 10))
-
-    #     # Right panel for canvas
-    #     self.right_panel = tk.Frame(self.window)
-    #     self.right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-    #     self.fig, self.ax = plt.subplots(figsize=(5, 4))
-    #     self.canvas = FigureCanvasTkAgg(self.fig, master=self.right_panel)
-    #     self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
     
     def _create_widgets(self):
         # Left panel (ttk.Frame)

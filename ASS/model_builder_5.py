@@ -88,13 +88,7 @@ class ModelBuilderWindow(tk.Toplevel):
         add_btn.pack(pady=10)
         clear_btn = ttk.Button(left_frame, text="Clear Model", command=self._on_clear_model)
         clear_btn.pack(pady=10)
-        # state_btn = ttk.Button(left_frame, text="Model ON/OFF", command=self._on_state)
-        # state_btn.pack(pady=10)
-        
-        # ttk.Label(left_frame, text="title:").pack(anchor='w')
-        # self.spectrum_title = ttk.Entry(left_frame)
-        # self.spectrum_title.pack(fill=tk.X, pady=(0, 10))
-        
+
         # Center/right: scrollable area for blocks
         container = ScrollableFrame(self)
         container.pack(side="right", fill="both", expand=True, padx=10, pady=10)
@@ -160,21 +154,6 @@ class ModelBuilderWindow(tk.Toplevel):
             if not blk.label_var.get().strip():
                 default = f"{blk.func_var.get()}_{i}"
                 blk.label_var.set(default)
-                
-    # def update_parameters_from_main(self, updated_components):
-    #     """
-    #     Called from the main GUI to refresh the displayed parameters.
-    #     """
-    #     print("Updating model builder window 1")
-
-    #     # Remove existing blocks
-    #     for block in list(self.function_blocks):
-    #         block.frame.destroy()
-    #     self.function_blocks.clear()
-
-    #     # Rebuild blocks from updated component list
-    #     for comp in updated_components:
-    #         self._add_function_block(prefill=comp)
                 
     def _on_state(self):
         if self.model_state == True:
@@ -310,8 +289,6 @@ class FunctionBlock:
 
 
         if func_name == "Linear":
-            # slope = (ys[-1]-ys[0])/(xs[-1]-xs[0]) if xs[-1]!=xs[0] else 0.0
-            # intercept = ys[0] - slope*xs[0]
             slope = (y_data[-1]-y_data[0])/(x_data[-1]-x_data[0]) if x_data[-1]!=x_data[0] else 0.0
             intercept = y_data[0] - slope*x_data[0]
             guesses = {"slope": slope, 
@@ -374,12 +351,6 @@ class FunctionBlock:
                        "alpha" : alpha}
         else:
             messagebox.showinfo("This is not defined function")
-
-        # for pname, widget_dict in self.entries.items():
-        #     if pname in guesses:
-        #         e = widget_dict["val"]
-        #         e.delete(0, "end")
-        #         e.insert(0, f"{guesses[pname]:.4g}")
         
         # Now fill in both the guessed values AND the bounds
         for pname, widget_dict in self.entries.items():
@@ -462,44 +433,6 @@ class FunctionBlock:
             wdict = self.entries.get(pname)
             if wdict:
                 wdict["lock"].set(locked)
-
-    
-    # def on_save(self):
-    #     func_name = self.func_var.get()
-        
-    #     # label = self.label_var.get().strip() or func_name
-    #     pnames    = model_dict[func_name]["params"]
-    
-    #     # build params dict, defaulting blank→0.0
-    #     params = {}
-    #     bounds = {}
-    #     for pname in pnames:
-    #         txt = self.entries[pname]["val"].get().strip()
-    #         guess = float(txt) if txt else 0.0
-    #         params[pname] = guess
-    #         if self.entries[pname]["lock"].get():
-    #             lb = guess-0.05
-    #             ub = guess+0.05
-    #         else:
-    #             mn = self.entries[pname]["min"].get().strip()
-    #             mx = self.entries[pname]["max"].get().strip()
-    #             lb = float(mn) if mn else -np.inf
-    #             ub = float(mx) if mx else  np.inf
-    #         bounds[pname] = (lb, ub)
-            
-    #     raw_label = self.label_var.get().strip()
-    #     label = raw_label if raw_label else f"{func_name}_{self.index}"
-    
-    #     comp = {
-    #       "model_name": func_name,
-    #       "label":      label,
-    #       "params":     params,
-    #       "bounds":     bounds,
-    #       "locks" :     {p: w["lock"].get() for p,w in self.entries.items()}
-    #       }
-    
-    #     print("🔖 Saving component:", comp)   # for debugging
-    #     self.save_callback(self.index, comp)
     
     def on_save(self):
         func_name = self.func_var.get()

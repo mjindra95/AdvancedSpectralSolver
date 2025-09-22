@@ -213,88 +213,6 @@ class Loading:
         )
 
         return df, metadata
-    
-    # def load_horiba_split_2D(folder):
-    #     pattern = os.path.join(folder, "*.txt")
-    #     files = sorted(glob.glob(pattern))
-    #     if not files:
-    #         raise ValueError(f'No .txt files in {folder}')
-            
-    #     df_raw = None
-    #     encodings    = ['ansi','utf-8','utf-16','iso-8859-1','windows-1250']
-    #     correct_encoding = None
-    #     for file in files:
-    #         try:
-    #             if correct_encoding is None:
-    #                 for enc in encodings:
-    #                     shift, intensity = np.loadtxt(file, usecols=(0,1), comment='#', encoding=enc)
-    #                     correct_encoding = enc
-    #                     break
-    #             else:
-    #                 shift, intensity = np.loadtxt(file, usecols=(0,1), comment = '#', encoding = correct_encoding)
-    #         except:
-    #             print(f"File {file} did not load")
-    #             break
-            
-    #         X, Y = Processing.extract_Horiba_coordinates(file)
-    #         if df_raw is None:
-    #             print(F"File {X}/{Y} will be loaded")
-    #             # append shift (name shift) as 1st column and intensity (name will contain info about X and Y cooridate) as 2nd column
-    #         else:
-    #             print(f"File {X}/{Y} will be loaded")
-    #             # check that shift is the same as 1st column of df_raw
-    #             # append intensity as the last column of the df_raw (name of the column will contain info about X and Y coordinates)
-        
-    
-    # def load_horiba_split_2D(folder):
-    #     pattern = os.path.join(folder, "*.txt")
-    #     files = sorted(glob.glob(pattern))
-    #     if not files:
-    #         raise ValueError(f'No .txt files in {folder}')
-    
-    #     df_raw = None
-    #     encodings = ['ansi', 'utf-8', 'utf-16', 'iso-8859-1', 'windows-1250']
-    #     correct_encoding = None
-    
-    #     for file in files:
-    #         # --- try encodings until one works ---
-    #         if correct_encoding is None:
-    #             for enc in encodings:
-    #                 try:
-    #                     shift, intensity = np.loadtxt(
-    #                         file, usecols=(0, 1), comments='#', encoding=enc, unpack=True
-    #                     )
-    #                     correct_encoding = enc
-    #                     break
-    #                 except Exception:
-    #                     continue
-    #             if correct_encoding is None:
-    #                 print(f"File {file} could not be decoded with given encodings")
-    #                 continue
-    #         else:
-    #             try:
-    #                 shift, intensity = np.loadtxt(
-    #                     file, usecols=(0, 1), comments='#', encoding=correct_encoding, unpack=True
-    #                 )
-    #             except Exception:
-    #                 print(f"File {file} failed to load with {correct_encoding}")
-    #                 continue
-    
-    #         # --- extract coordinates ---
-    #         X, Y = Processing.extract_Horiba_coordinates(file)  # your function
-    
-    #         # --- build dataframe ---
-    #         if df_raw is None:
-    #             print(f"File {X}/{Y} will be loaded (first)")
-    #             df_raw = pd.DataFrame({"shift": shift, f"I({X}/{Y})": intensity})
-    #         else:
-    #             print(f"File {X}/{Y} will be loaded")
-    #             # check shift consistency
-    #             if not np.allclose(df_raw["shift"].values, shift, atol=1e-6):
-    #                 raise ValueError(f"Shift axis in {file} does not match reference")
-    #             df_raw[f"I({X},{Y})"] = intensity
-    
-    #     return df_raw
 
     def load_horiba_split_2D(folder):
         pattern = os.path.join(folder, "*.txt")
@@ -707,73 +625,6 @@ class Processing:
             idx += len(pnames)
             y += model_dict[model_name]["func"](x, *vals)
         return y
-    
-    # @staticmethod # this function is running 2D map fit on all cores of CPU (fast) but it is not working when the app is wrapped into .exe file anymore...
-    # def compute_2d_fit(df_raw, components, lower_shift=None, upper_shift=None):
-    #     """
-    #     For each pixel (column) in df_raw:
-    #      - clip to lower/upper shift
-    #      - fit the composite model defined by `components`
-    #      - return a DataFrame with columns X, Y, and each fitted param
-    #     """
-    #     # 1) build the shift vector + intensity block
-    #     shift = df_raw.iloc[:,0].astype(float).to_numpy()
-    #     data  = df_raw.iloc[:,1:].astype(float)
-
-    #     # 2) clip by shift
-    #     lo = shift.min() if lower_shift is None else lower_shift
-    #     hi = shift.max() if upper_shift is None else upper_shift
-    #     mask = (shift >= lo) & (shift <= hi)
-    #     x    = shift[mask]
-
-    #     # 3) prepare a global p0 & bounds from your components
-    #     p0_list, lb_list, ub_list = [], [], []
-    #     for comp in components:
-    #         model_name = comp["model_name"]
-    #         pnames = model_dict[model_name]["params"]
-    #         for pn in pnames:
-    #             p0_list.append(comp["params"][pn])
-    #             lo_b, hi_b = comp["bounds"][pn]
-    #             lb_list.append(-np.inf if lo_b is None else lo_b)
-    #             ub_list.append( np.inf if hi_b is None else hi_b)
-    #     p0     = np.array(p0_list, dtype=float)
-    #     bounds = (np.array(lb_list, dtype=float), np.array(ub_list, dtype=float))
-
-    #     # 4) define a helper that fits one pixel
-    #     def _fit_column(colname):
-    #         y = data[colname].values[mask]
-    #         xpix, ypix = Processing.extract_witec_coordinates(colname)
-    #         if xpix is None:
-    #             return None
-
-    #         try:
-    #             popt, _ = curve_fit(
-    #                 lambda xx, *pp: Processing._make_composite(xx, pp, components),
-    #                 x, y, p0=p0, bounds=bounds
-    #             )
-    #         except:
-    #             return None
-
-    #         # assemble the record
-    #         rec = {"X": xpix, "Y": ypix}
-    #         idx = 0
-    #         for comp in components:
-    #             model_name = comp["model_name"]
-    #             pnames = model_dict[model_name]["params"]
-    #             label = comp.get("label", model_name)
-    #             for pn in pnames:
-    #                 rec[f"{label}_{pn}"] = popt[idx]
-    #                 idx += 1
-    #         return rec
-
-    #     # 5) run in parallel
-    #     records = Parallel(n_jobs=-1)(
-    #         delayed(_fit_column)(col) for col in data.columns
-    #     )
-    #     records = [r for r in records if r is not None]
-
-    #     # 6) collect into a DataFrame
-    #     return pd.DataFrame.from_records(records)
     
     @staticmethod
     def compute_2d_fit(df_raw, components, lower_shift=None, upper_shift=None):
@@ -1257,11 +1108,6 @@ class Plotting:
         ax.set_xlabel(r"Raman shift (cm$^{-1}$)")
         
         fig.colorbar(img, ax=ax, label="Intensity (a.u.)")
-        
-        # # 5) Create a fixed-position colorbar using a divider
-        # divider = make_axes_locatable(ax)
-        # cax = divider.append_axes("right", size="5%", pad=0.05)
-        # ax.figure.colorbar(img, cax=cax, label="Intensity (a.u.)")
         return ax, Data_df
         
     @staticmethod
