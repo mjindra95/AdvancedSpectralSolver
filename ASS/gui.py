@@ -63,10 +63,13 @@ class MainWindow:
         self.filtered_data = None
         self.active_filter = None
         self.compare_data = None
+        self.compare_data_raw = None
         self.compare_trigger = False
         
         self.filename = None
         self.compare_filename = None
+        
+        self.model_state = True
         
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         
@@ -105,6 +108,7 @@ class MainWindow:
         file_menu.add_command(label="Load Horiba spectrum", command=self.load_horiba_data, accelerator="Ctrl+h")
         file_menu.add_command(label="Load Witec spectrum", command=self.load_witec_data, accelerator="Ctrl+w")
         file_menu.add_command(label="Load default spectrum", command=self.load_default_data, accelerator="Ctrl+d")
+        file_menu.add_command(label="Load user spectrum", command=self.load_user_data, accelerator="Ctrl+u")
         # file_menu.add_separator()
         # file_menu.add_command(label="Save Plot",    command=self.save_plot,    accelerator="Ctrl+p")
         # file_menu.add_command(label="Save Report",  command=self.save_report,  accelerator="Ctrl+r")
@@ -132,6 +136,7 @@ class MainWindow:
         model_menu.add_command(label="Clear Model", command=self.clear_model)
         model_menu.add_separator()
         model_menu.add_command(label="Optimize Model", command=self.optimize_model, accelerator="Ctrl+f")
+        model_menu.add_command(label="Enable/Disable Model", command=self.model_on_off)
         model_menu.add_separator()
         model_menu.add_command(label="Save Plot",    command=self.save_plot,    accelerator="Ctrl+p")
         model_menu.add_command(label="Save Report",  command=self.save_report,  accelerator="Ctrl+r")
@@ -368,31 +373,40 @@ class MainWindow:
             self.canvas.draw()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load default data: {e}")
+    
+    def load_user_data(self):
+        messagebox.showinfo("Info", "User defined format will be added soon...")
 
     def open_load_window(self):
         """Popup a small window with Load Horiba / Load Witec buttons."""
         win = tk.Toplevel(self.root)
         win.title("Load Data")
-        win.geometry("240x120")
+        win.geometry("240x150")
         win.transient(self.root)
         win.grab_set()   # make it modal
 
         ttk.Button(
             win,
-            text="Load Horiba",
+            text="Load Horiba format",
             command=lambda: (win.destroy(), self.load_horiba_data())
         ).pack(fill=tk.X, padx=10, pady=5)
 
         ttk.Button(
             win,
-            text="Load Witec",
+            text="Load Witec format",
             command=lambda: (win.destroy(), self.load_witec_data())
         ).pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Button(
             win,
-            text="Load default",
+            text="Load default format",
             command=lambda: (win.destroy(), self.load_default_data())
+        ).pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(
+            win,
+            text="User defined format",
+            command=lambda: (win.destroy(), self.load_user_data())
         ).pack(fill=tk.X, padx=10, pady=5)
 
                 
@@ -455,8 +469,12 @@ class MainWindow:
         self._disable_zoom()
 
     def reset_zoom(self):
-        self.display_data = self.raw_data.copy()
-        self.compare_data = self.compare_data_raw.copy()
+        if self.display_data is None:
+            return messagebox.showerror("Data error", "No data to show")
+        else:
+            self.display_data = self.raw_data.copy()
+        if self.compare_data_raw is not None:
+            self.compare_data = self.compare_data_raw.copy()
         if getattr(self, "active_filter", None) is not None:
             func_name, fparams = self.active_filter
             xz = self.display_data["X"].values
@@ -471,6 +489,7 @@ class MainWindow:
                     "Showing unfiltered data instead."
                 )
                 self.filtered_data = None
+        self.batch_xlim = None
         self.update_composite_plot()
     
     def open_model_builder(self):
@@ -603,7 +622,7 @@ class MainWindow:
         self.update_composite_plot()
         
     def update_composite_plot(self):
-        Plotting.update_plot(self.fig, self.display_data, self.filename, self.components, self.filtered_data, self.compare_data, self.compare_filename)
+        Plotting.update_plot(self.fig, self.display_data, self.filename, self.components, self.filtered_data, self.compare_data, self.compare_filename, self.model_state)
         # rebind the left-axis in case update_plot re-created it
         self.ax = self.fig.axes[0]
         self.canvas.draw()
@@ -776,7 +795,15 @@ class MainWindow:
             clear_callback = self.clear_model,
             existing=existing
         )
-
+        
+    def model_on_off(self):
+        if self.model_state is True:
+            self.model_state = False
+        else:
+            self.model_state = True
+        
+        self.update_composite_plot()
+        self.canvas.draw()
         
     def save_plot(self):
         """Export the current canvas as an image."""
@@ -1261,9 +1288,6 @@ class MainWindow:
             return
         # On Windows, you could also do: os.startfile(help_pdf)
         webbrowser.open_new(help_pdf)
-        
-    def show_compare(self):
-        messagebox.showinfo("Compare data", "Compare of the data will be added soon!")
 
     def open_filter_window(self):
         """
@@ -1390,41 +1414,49 @@ class MainWindow:
         #messagebox.showinfo("Compare spectrum", "Compare spectrum will be added")
         self.compare_trigger = True
         print("Trigger set to True")
-        """Popup a small window with Load Horiba / Load Witec buttons."""
-        win = tk.Toplevel(self.root)
-        win.title("Load Data")
-        win.geometry("240x120")
-        win.transient(self.root)
-        win.grab_set()   # make it modal
+        self.open_load_window()
+        # win = tk.Toplevel(self.root)
+        # win.title("Load Data")
+        # win.geometry("240x150")
+        # win.transient(self.root)
+        # win.grab_set()   # make it modal
 
-        ttk.Button(
-            win,
-            text="Load Horiba",
-            command=lambda: (win.destroy(), self.load_horiba_data())
-        ).pack(fill=tk.X, padx=10, pady=5)
+        # ttk.Button(
+        #     win,
+        #     text="Load Horiba",
+        #     command=lambda: (win.destroy(), self.load_horiba_data())
+        # ).pack(fill=tk.X, padx=10, pady=5)
 
-        ttk.Button(
-            win,
-            text="Load Witec",
-            command=lambda: (win.destroy(), self.load_witec_data())
-        ).pack(fill=tk.X, padx=10, pady=5)
+        # ttk.Button(
+        #     win,
+        #     text="Load Witec",
+        #     command=lambda: (win.destroy(), self.load_witec_data())
+        # ).pack(fill=tk.X, padx=10, pady=5)
         
-        ttk.Button(
-            win,
-            text="Load default",
-            command=lambda: (win.destroy(), self.load_default_data())
-        ).pack(fill=tk.X, padx=10, pady=5)
+        # ttk.Button(
+        #     win,
+        #     text="Load default",
+        #     command=lambda: (win.destroy(), self.load_default_data())
+        # ).pack(fill=tk.X, padx=10, pady=5)
+        
+        # ttk.Button(
+        #     win,
+        #     text="User defined format",
+        #     command=lambda: (win.destroy(), self.load_default_data())
+        # ).pack(fill=tk.X, padx=10, pady=5)
+
         
     def disable_compare(self):
         # self.compare_data_raw = None
         self.compare_data = None
+        self.compare_data_raw = None
         self.compare_filename = None
         
         self.update_composite_plot()
         self.canvas.draw()
         
     def spectrum_operation(self):
-        messagebox.showinfo("Spectrum calculation", "Spectrum calculation will be added")
+        messagebox.showinfo("Spectrum oparation", "Mathematical operations with the spectrum will be added")
 
     def run(self):
         self.root.mainloop()

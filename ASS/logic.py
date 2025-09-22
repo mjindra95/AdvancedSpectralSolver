@@ -830,7 +830,7 @@ class Plotting:
     def __init__(self, data):
         self.data = data
            
-    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename):
+    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state):
 
         fig.clear()
 
@@ -854,7 +854,7 @@ class Plotting:
             y_comp_x = func(x, *pvals)
             composite_at_x += y_comp_x
 
-        if not np.allclose(composite, 0.0):
+        if not np.allclose(composite, 0.0) and model_state is True:
             # — full plot: individual components + composite & residual spectrum
             gs = GridSpec(nrows=2, ncols=1, height_ratios=[2, 8], hspace=0.05, figure=fig)
             ax_bott_left  = fig.add_subplot(gs[1,0])
