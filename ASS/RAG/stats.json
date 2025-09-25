@@ -1,0 +1,9 @@
+{
+  "created": "2025-09-24T10:31:54.095368Z",
+  "pdf_dir": "C:\\Users\\marti\\Documents\\Data\\RAG_test\\Ass help file",
+  "num_pdfs": 1,
+  "num_chunks": 33,
+  "vector_dim": 384,
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "device": "cpu"
+}

@@ -24,6 +24,7 @@ from ASS.filtering import FilterWindow
 from ASS.map_1D import Map_1D
 from ASS.map_2D import Map_2D
 from ASS.excel_plotter import ExcelPlotWindow
+from ASS.chatbot import ChatbotApp
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -35,24 +36,10 @@ class MainWindow:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Advanced Spectral Solver")
-        # # Get user screen resolution
-        # screen_width = self.root.winfo_screenwidth()
-        # screen_height = self.root.winfo_screenheight()
 
-        # # Set window size (for example, 90% of screen dimensions)
-        # window_width = int(screen_width * 0.8)
-        # window_height = int(screen_height * 0.8)
-
-        # # Center the window
-        # x_pos = (screen_width - window_width) // 2
-        # y_pos = (screen_height - window_height) // 2
-
-        # self.root.geometry(f"{window_width}x{window_height}+{x_pos}+{y_pos}")
         self.root.state("zoomed")
         self.root.resizable(True, True)
 
-        # self.root.geometry("1600x900")
-        # self.root.resizable(True, True)
         self._create_menu()
         self._create_layout()
         self._create_plot()
@@ -61,6 +48,7 @@ class MainWindow:
         self.batch_xlim = None
         self.rectangle_selector = None
         self.filtered_data = None
+        self.filtered_compare_data = None
         self.active_filter = None
         self.compare_data = None
         self.compare_data_raw = None
@@ -109,7 +97,7 @@ class MainWindow:
         spectrum_menu.add_command(label="Compare spectrum", command=self.compare_spectrum)
         spectrum_menu.add_command(label="Disable compare", command=self.disable_compare)
         spectrum_menu.add_separator()
-        spectrum_menu.add_command(label="Spectrum operation", command=self.spectrum_operation)
+        # spectrum_menu.add_command(label="Spectrum operation", command=self.spectrum_operation)
         spectrum_menu.add_command(label="Save spectrum (data)", command = self.save_spectrum)
         spectrum_menu.add_command(label="Save spectrum (plot)", command = self.save_plot)
         menubar.add_cascade(label="Spectrum", menu=spectrum_menu)
@@ -132,18 +120,20 @@ class MainWindow:
 
         advanced_menu = tk.Menu(menubar, tearoff=0)
         advanced_menu.add_command(label="Filtering", command=self.open_filter_window)
+        advanced_menu.add_command(label="Excel plot", command = self.excel_plot)
         advanced_menu.add_separator()
         advanced_menu.add_command(label="Batch analysis", command=self.batch_fit)
         advanced_menu.add_command(label="1D Map analysis", command=self.map_1D)
         advanced_menu.add_command(label="2D Map analysis", command=self.map_2D)
-        advanced_menu.add_separator()
-        advanced_menu.add_command(label="Excel plot", command = self.excel_plot)
+        # advanced_menu.add_separator()
+        # advanced_menu.add_command(label="Open chat", command = self.open_chat)
         menubar.add_cascade(label="Advanced", menu=advanced_menu)
 
         about_menu = tk.Menu(menubar, tearoff=0)
         about_menu.add_command(label="About", command=self.show_about)
         about_menu.add_command(label="Help", command=self.show_help)
         about_menu.add_command(label="Report bug", command=self.report_bug)
+        about_menu.add_command(label="Open chat", command=self.open_chat)
         menubar.add_cascade(label="About", menu=about_menu)
 
         self.root.config(menu=menubar)
@@ -240,17 +230,39 @@ class MainWindow:
             if self.compare_trigger == True:
                 self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_horiba(path)
                 self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
-                self.compare_data = self.compare_data_raw.copy()
                 if self.batch_xlim is not None:
                     xmin, xmax = self.batch_xlim
                     xmin, xmax = float(xmin), float(xmax)
-                    mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
-                    self.compare_data = self.compare_data.loc[mask].reset_index(drop=True)
+                    mask = (self.compare_data_raw['X'] >= xmin) & (self.compare_data_raw['X'] <= xmax)
+                    self.compare_data = self.compare_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.compare_data = self.compare_data_raw.copy()
+                self.filtered_compare_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.compare_data["X"].values
+                    y_slice = self.compare_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_compare_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_compare_data = None
                 self.compare_trigger = False
             else:
                 self.x_data, self.y_data, self.filename = Loading.load_horiba(path)
                 self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
-                self.display_data = self.raw_data.copy()
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.raw_data['X'] >= xmin) & (self.raw_data['X'] <= xmax)
+                    self.display_data = self.raw_data.loc[mask].reset_index(drop=True)
+                else:
+                    self.display_data = self.raw_data.copy()
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
@@ -280,17 +292,39 @@ class MainWindow:
             if self.compare_trigger == True:
                 self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_witec(path)
                 self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
-                self.compare_data = self.compare_data_raw.copy()
                 if self.batch_xlim is not None:
                     xmin, xmax = self.batch_xlim
                     xmin, xmax = float(xmin), float(xmax)
-                    mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
-                    self.compare_data = self.compare_data.loc[mask].reset_index(drop=True)
+                    mask = (self.compare_data_raw['X'] >= xmin) & (self.compare_data_raw['X'] <= xmax)
+                    self.compare_data = self.compare_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.compare_data = self.compare_data_raw.copy()
+                self.filtered_compare_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.compare_data["X"].values
+                    y_slice = self.compare_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_compare_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_compare_data = None
                 self.compare_trigger = False
             else:
                 self.x_data, self.y_data, self.filename = Loading.load_witec(path)
                 self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
-                self.display_data = self.raw_data.copy()
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.raw_data['X'] >= xmin) & (self.raw_data['X'] <= xmax)
+                    self.display_data = self.raw_data.loc[mask].reset_index(drop=True)
+                else:
+                    self.display_data = self.raw_data.copy()
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
@@ -321,17 +355,39 @@ class MainWindow:
             if self.compare_trigger == True:
                 self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_default(path)
                 self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
-                self.compare_data = self.compare_data_raw.copy()
                 if self.batch_xlim is not None:
                     xmin, xmax = self.batch_xlim
                     xmin, xmax = float(xmin), float(xmax)
-                    mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
-                    self.compare_data = self.compare_data.loc[mask].reset_index(drop=True)
+                    mask = (self.compare_data_raw['X'] >= xmin) & (self.compare_data_raw['X'] <= xmax)
+                    self.compare_data = self.compare_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.compare_data = self.compare_data_raw.copy()
+                self.filtered_compare_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.compare_data["X"].values
+                    y_slice = self.compare_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_compare_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_compare_data = None
                 self.compare_trigger = False
             else:
                 self.x_data, self.y_data, self.filename = Loading.load_default(path)
                 self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
-                self.display_data = self.raw_data.copy()
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.raw_data['X'] >= xmin) & (self.raw_data['X'] <= xmax)
+                    self.display_data = self.raw_data.loc[mask].reset_index(drop=True)
+                else:
+                    self.display_data = self.raw_data.copy()
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
@@ -421,14 +477,17 @@ class MainWindow:
             compare_mask = (self.compare_data['X'] >= xmin) & (self.compare_data['X'] <= xmax)
             self.compare_data = self.compare_data.loc[compare_mask].reset_index(drop=True)
     
-        # 2) If a filter is active, re‐apply it to the *new* display_data
         if getattr(self, "active_filter", None) is not None:
             func_name, fparams = self.active_filter
             xz = self.display_data["X"].values
             yz = self.display_data["Y"].values
+            xc = self.compare_data["X"].values
+            yc = self.compare_data["Y"].values
             try:
                 y_filt = getattr(Filtering, func_name)(xz, yz, **fparams)
                 self.filtered_data = pd.DataFrame({"X": xz, "Y": y_filt})
+                yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
+                self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
             except Exception as fe:
                 messagebox.showwarning(
                     "Filter Warning",
@@ -436,6 +495,7 @@ class MainWindow:
                     "Showing unfiltered data instead."
                 )
                 self.filtered_data = None
+                self.filtered_compare_data = None
     
         # 3) Store zoom limits for batch fit
         self.batch_xlim = (xmin, xmax)
@@ -458,9 +518,13 @@ class MainWindow:
             func_name, fparams = self.active_filter
             xz = self.display_data["X"].values
             yz = self.display_data["Y"].values
+            xc = self.compare_data["X"].values
+            yc = self.compare_data["Y"].values
             try:
                 y_filt = getattr(Filtering, func_name)(xz, yz, **fparams)
                 self.filtered_data = pd.DataFrame({"X": xz, "Y": y_filt})
+                yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
+                self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
             except Exception as fe:
                 messagebox.showwarning(
                     "Filter Warning",
@@ -468,6 +532,7 @@ class MainWindow:
                     "Showing unfiltered data instead."
                 )
                 self.filtered_data = None
+                self.filtered_compare_data = None
         self.batch_xlim = None
         self.update_composite_plot()
     
@@ -584,7 +649,7 @@ class MainWindow:
         self.update_composite_plot()
         
     def update_composite_plot(self):
-        Plotting.update_plot(self.fig, self.display_data, self.filename, self.components, self.filtered_data, self.compare_data, self.compare_filename, self.model_state)
+        Plotting.update_plot(self.fig, self.display_data, self.filename, self.components, self.filtered_data, self.compare_data, self.compare_filename, self.model_state, self.filtered_compare_data)
         # rebind the left-axis in case update_plot re-created it
         self.ax = self.fig.axes[0]
         self.canvas.draw()
@@ -1290,6 +1355,7 @@ class MainWindow:
         Called by FilterWindow “Disable.” Remove any filter and redraw.
         """
         self.filtered_data = None
+        self.filtered_compare_data = None
         self.active_filter = None
         self.update_composite_plot()
 
@@ -1375,11 +1441,16 @@ class MainWindow:
         self.update_composite_plot()
         self.canvas.draw()
         
-    def spectrum_operation(self):
-        messagebox.showinfo("Spectrum oparation", "Mathematical operations with the spectrum will be added")
+    # def spectrum_operation(self):
+    #     messagebox.showinfo("Spectrum oparation", "Mathematical operations with the spectrum will be added")
         
     def report_bug(self):
         messagebox.showinfo("Report bug", "If you will find some error, you can report it at the Github repository (https://github.com/mjindra95/AdvancedSpectralSolver) or write email to martin.jindra97@gmail.com")
+
+    def open_chat(self):
+        chat_window = tk.Toplevel()
+        ChatbotApp(chat_window)
+        chat_window.grab_set()  # focus on this window
 
     def run(self):
         self.root.mainloop()

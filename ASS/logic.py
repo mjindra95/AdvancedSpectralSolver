@@ -838,7 +838,7 @@ class Plotting:
     def __init__(self, data):
         self.data = data
            
-    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state):
+    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state, filtered_compare_data):
 
         fig.clear()
 
@@ -928,12 +928,16 @@ class Plotting:
         else:
             ax_left  = fig.add_subplot(111)
             if filtered_data is not None:
-                ax_left.plot(x, y, linestyle = 'dotted', color = 'black', label=f'{filename} (raw)')
-                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=f'{filename} filtered')
+                ax_left.plot(x, y, linestyle = 'dotted', color = 'blue', label=f'{filename} (raw)', alpha = 0.5)
+                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=f'{filename} (filtered)')
             else:
                 ax_left.plot(x, y, color = 'blue', label=f'{filename} (raw)')
             if compare_data is not None:
-                ax_left.plot(compare_data["X"].values, compare_data["Y"].values, color='green', label=f'{compare_filename} (raw)')
+                if filtered_compare_data is not None:
+                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values, linestyle = 'dotted', color = 'green', label=f'{compare_filename} (raw)', alpha = 0.5)
+                    ax_left.plot(filtered_compare_data["X"].values, filtered_compare_data["Y"].values, color='green', label=f'{compare_filename} (filtered)')
+                else:
+                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values, color='green', label=f'{compare_filename} (raw)')
             ax_left.legend(loc='best')
             ax_left.set_xlabel(r'Raman shift (cm$^{-1}$)')
             ax_left.set_ylabel('Intensity (arb. u.)')

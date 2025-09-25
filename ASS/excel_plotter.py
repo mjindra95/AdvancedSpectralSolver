@@ -68,7 +68,6 @@ class ExcelPlotWindow:
         path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
         if not path:
             return
-
         try:
             self.df = pd.read_excel(path)
         except Exception as e:
