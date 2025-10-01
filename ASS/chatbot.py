@@ -167,7 +167,7 @@ class ChatbotApp:
         # Load DB
         try:
             self.index, self.meta, self.model = load_rag_db()
-            self.display_message("System", f"RAG DB loaded. {len(self.meta)} chunks available.")
+            # self.display_message("System", f"RAG DB loaded. {len(self.meta)} chunks available.")
         except Exception as e:
             self.index = self.meta = self.model = None
             self.display_message("Error", f"Failed to load RAG DB:\n{e}")

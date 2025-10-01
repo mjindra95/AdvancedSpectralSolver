@@ -25,6 +25,8 @@ from ASS.map_1D import Map_1D
 from ASS.map_2D import Map_2D
 from ASS.excel_plotter import ExcelPlotWindow
 from ASS.chatbot import ChatbotApp
+from ASS.user_loader import UserLoaderConfigWindow
+from ASS.plot_config import PlotConfigWindow
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -53,9 +55,13 @@ class MainWindow:
         self.compare_data = None
         self.compare_data_raw = None
         self.compare_trigger = False
+        self.substract_data = None
+        self.substract_data_raw = None
+        self.substract_trigger = False
         
         self.filename = None
         self.compare_filename = None
+        self.substract_filename = None
         
         self.model_state = True
         
@@ -91,15 +97,32 @@ class MainWindow:
         file_menu.add_command(label="Load Witec spectrum", command=self.load_witec_data, accelerator="Ctrl+w")
         file_menu.add_command(label="Load default spectrum", command=self.load_default_data, accelerator="Ctrl+d")
         file_menu.add_command(label="Load user spectrum", command=self.load_user_data, accelerator="Ctrl+u")
+        file_menu.add_separator()
+        file_menu.add_command(label="Modify user spectrum details", command = self.modify_user_loader)
         menubar.add_cascade(label="File", menu=file_menu)
         
         spectrum_menu = tk.Menu(menubar, tearoff=0)
+        # spectrum_menu.add_command(label = "Update plot", command=self.update_composite_plot)
+        # spectrum_menu.add_separator()
         spectrum_menu.add_command(label="Compare spectrum", command=self.compare_spectrum)
-        spectrum_menu.add_command(label="Disable compare", command=self.disable_compare)
+        spectrum_menu.add_command(label="Delete compare", command=self.disable_compare)
+        spectrum_menu.add_separator()
+        spectrum_menu.add_command(label = "Substract minimum", command=self.sub_minimum)
+        spectrum_menu.add_command(label = "Linear correction", command=self.sub_linear)
+        spectrum_menu.add_command(label = "Substract spectrum", command=self.sub_spectrum)
+        spectrum_menu.add_command(label = "Normalize spectrum", command=self.norm_spectrum)
+        spectrum_menu.add_separator()
+        spectrum_menu.add_command(label = "Batch minimum substraction", command=self.batch_sub_min)
+        spectrum_menu.add_command(label = "Batch linear correction", command=self.batch_sub_linear)
+        spectrum_menu.add_command(label = "Batch spectrum substration", command=self.batch_sub_spectrum)
+        spectrum_menu.add_command(label = "Batch spectrum normalization", command=self.batch_norm)
         spectrum_menu.add_separator()
         # spectrum_menu.add_command(label="Spectrum operation", command=self.spectrum_operation)
-        spectrum_menu.add_command(label="Save spectrum (data)", command = self.save_spectrum)
-        spectrum_menu.add_command(label="Save spectrum (plot)", command = self.save_plot)
+        spectrum_menu.add_command(label="Save spectrum", command = self.save_spectrum)
+        spectrum_menu.add_command(label="Save plot", command = self.save_plot)
+        spectrum_menu.add_command(label="Save all data", command = self.save_data)
+        spectrum_menu.add_separator()
+        spectrum_menu.add_command(label="Plot config file", command = self.spectrum_config)
         menubar.add_cascade(label="Spectrum", menu=spectrum_menu)
 
         model_menu = tk.Menu(menubar, tearoff=0)
@@ -121,6 +144,7 @@ class MainWindow:
         advanced_menu = tk.Menu(menubar, tearoff=0)
         advanced_menu.add_command(label="Filtering", command=self.open_filter_window)
         advanced_menu.add_command(label="Excel plot", command = self.excel_plot)
+        advanced_menu.add_command(label="PCA", command = self.show_message)
         advanced_menu.add_separator()
         advanced_menu.add_command(label="Batch analysis", command=self.batch_fit)
         advanced_menu.add_command(label="1D Map analysis", command=self.map_1D)
@@ -171,13 +195,22 @@ class MainWindow:
         self.sep.pack(fill=tk.X, pady=(5, 5))
         ttk.Button(self.left_panel, text="Built/Edit Model", command=self.open_model_builder).pack(fill=tk.X, pady=5)
         ttk.Button(self.left_panel, text="Optimize Model", command=self.optimize_model).pack(fill=tk.X, pady=5)
+        self.sep = ttk.Separator(self.left_panel, orient="horizontal")
+        self.sep.pack(fill=tk.X, pady=(5, 5))
+        ttk.Button(self.left_panel, text="Save Plot", command=self.save_plot).pack(fill=tk.X, pady=5)
+        ttk.Button(self.left_panel, text="Save Report", command=self.save_report).pack(fill=tk.X, pady=5)
 
     def _create_plot(self):
+        
+        # Load config
+        with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+            
         self.fig = Figure(figsize=(6, 4))
         self.ax = self.fig.add_subplot(111)
         self.ax.set_title("Spectrum")
-        self.ax.set_xlabel("Raman Shift (cm$^{-1}$)")
-        self.ax.set_ylabel("Intensity")
+        self.ax.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
+        self.ax.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_panel)
         # self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -202,6 +235,9 @@ class MainWindow:
         
     def _on_canvas_right_click(self, event):
         menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label = "Update plot", command = self.update_composite_plot)
+        menu.add_command(label = "Plot config file", command = self.spectrum_config)
+        menu.add_separator()
         menu.add_command(label="Save Plot",   command=self.save_plot)
         menu.add_command(label="Save Report", command=self.save_report)
         menu.add_command(label="Save Both",   command=self.save_both)
@@ -213,6 +249,7 @@ class MainWindow:
         self.root.bind("<Control-h>", lambda event: self.load_horiba_data())
         self.root.bind("<Control-w>", lambda event: self.load_witec_data())
         self.root.bind("<Control-d>", lambda event: self.load_default_data())
+        self.root.bind("<Control-u>", lambda event: self.load_user_data())
         self.root.bind("<Control-m>", lambda event: self.save_model())
         self.root.bind("<Control-l>", lambda event: self.load_model())
         self.root.bind("<Control-f>", lambda event: self.optimize_model())
@@ -253,6 +290,58 @@ class MainWindow:
                         )
                         self.filtered_compare_data = None
                 self.compare_trigger = False
+                
+            elif self.substract_trigger == True:
+                self.substract_data_x, self.substract_data_y, self.substract_filename = Loading.load_horiba(path)
+                self.substract_data_raw = pd.DataFrame({'X': self.substract_data_x, 'Y': self.substract_data_y})
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.substract_data_raw['X'] >= xmin) & (self.substract_data_raw['X'] <= xmax)
+                    self.substract_data = self.substract_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.substract_data = self.substract_data_raw.copy()
+                    
+                x, y = Processing.substract_spectrum(self.display_data['X'], self.display_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                self.display_data = pd.DataFrame({'X':x, 'Y':y})
+                
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.dispalay_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
+                        
+                if self.compare_data is not None:
+                    x_com, y_com = Processing.substract_spectrum(self.compare_data['X'], self.compare_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                    self.compare_data = pd.DataFrame({'X':x_com, 'Y':y_com})
+                    
+                    self.filtered_compare_data = None
+                    if getattr(self, "active_filter", None) is not None:
+                        func_name, fparams = self.active_filter
+                        x_slice_com = self.compare_data["X"].values
+                        y_slice_com = self.compare_data["Y"].values
+                        try:
+                            y_filt = getattr(Filtering, func_name)(x_slice_com, y_slice_com, **fparams)
+                            self.filtered_compare_data = pd.DataFrame({"X": x_slice_com, "Y": y_filt})
+                        except Exception as fe:
+                            messagebox.showwarning(
+                                "Filter Warning",
+                                f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                                "Showing unfiltered data instead."
+                            )
+                            self.filtered_compare_data = None
+                        
+                self.substract_trigger = False
             else:
                 self.x_data, self.y_data, self.filename = Loading.load_horiba(path)
                 self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
@@ -315,6 +404,58 @@ class MainWindow:
                         )
                         self.filtered_compare_data = None
                 self.compare_trigger = False
+                
+            elif self.substract_trigger == True:
+                self.substract_data_x, self.substract_data_y, self.substract_filename = Loading.load_witec(path)
+                self.substract_data_raw = pd.DataFrame({'X': self.substract_data_x, 'Y': self.substract_data_y})
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.substract_data_raw['X'] >= xmin) & (self.substract_data_raw['X'] <= xmax)
+                    self.substract_data = self.substract_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.substract_data = self.substract_data_raw.copy()
+                    
+                x, y = Processing.substract_spectrum(self.display_data['X'], self.display_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                self.display_data = pd.DataFrame({'X':x, 'Y':y})
+                
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.dispalay_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
+                        
+                if self.compare_data is not None:
+                    x_com, y_com = Processing.substract_spectrum(self.compare_data['X'], self.compare_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                    self.compare_data = pd.DataFrame({'X':x_com, 'Y':y_com})
+                    
+                    self.filtered_compare_data = None
+                    if getattr(self, "active_filter", None) is not None:
+                        func_name, fparams = self.active_filter
+                        x_slice_com = self.compare_data["X"].values
+                        y_slice_com = self.compare_data["Y"].values
+                        try:
+                            y_filt = getattr(Filtering, func_name)(x_slice_com, y_slice_com, **fparams)
+                            self.filtered_compare_data = pd.DataFrame({"X": x_slice_com, "Y": y_filt})
+                        except Exception as fe:
+                            messagebox.showwarning(
+                                "Filter Warning",
+                                f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                                "Showing unfiltered data instead."
+                            )
+                            self.filtered_compare_data = None
+                        
+                self.substract_trigger = False
             else:
                 self.x_data, self.y_data, self.filename = Loading.load_witec(path)
                 self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
@@ -341,7 +482,6 @@ class MainWindow:
                         )
                         self.filtered_data = None
             self.update_composite_plot()
-            # Plotting.plot_data(self.ax, self.display_data, label=filename)
             self.canvas.draw()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load Witec data: {e}")
@@ -378,6 +518,57 @@ class MainWindow:
                         )
                         self.filtered_compare_data = None
                 self.compare_trigger = False
+            elif self.substract_trigger == True:
+                self.substract_data_x, self.substract_data_y, self.substract_filename = Loading.load_default(path)
+                self.substract_data_raw = pd.DataFrame({'X': self.substract_data_x, 'Y': self.substract_data_y})
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.substract_data_raw['X'] >= xmin) & (self.substract_data_raw['X'] <= xmax)
+                    self.substract_data = self.substract_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.substract_data = self.substract_data_raw.copy()
+                    
+                x, y = Processing.substract_spectrum(self.display_data['X'], self.display_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                self.display_data = pd.DataFrame({'X':x, 'Y':y})
+                
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.dispalay_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
+                        
+                if self.compare_data is not None:
+                    x_com, y_com = Processing.substract_spectrum(self.compare_data['X'], self.compare_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                    self.compare_data = pd.DataFrame({'X':x_com, 'Y':y_com})
+                    
+                    self.filtered_compare_data = None
+                    if getattr(self, "active_filter", None) is not None:
+                        func_name, fparams = self.active_filter
+                        x_slice_com = self.compare_data["X"].values
+                        y_slice_com = self.compare_data["Y"].values
+                        try:
+                            y_filt = getattr(Filtering, func_name)(x_slice_com, y_slice_com, **fparams)
+                            self.filtered_compare_data = pd.DataFrame({"X": x_slice_com, "Y": y_filt})
+                        except Exception as fe:
+                            messagebox.showwarning(
+                                "Filter Warning",
+                                f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                                "Showing unfiltered data instead."
+                            )
+                            self.filtered_compare_data = None
+                        
+                self.substract_trigger = False
             else:
                 self.x_data, self.y_data, self.filename = Loading.load_default(path)
                 self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
@@ -404,13 +595,123 @@ class MainWindow:
                         )
                         self.filtered_data = None
             self.update_composite_plot()
-            #Plotting.plot_data(self.ax, self.display_data, label=filename)
             self.canvas.draw()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load default data: {e}")
     
     def load_user_data(self):
-        messagebox.showinfo("Info", "User defined format will be added soon...")
+        print("Load user data triggered")
+        path = File_utils.ask_spectrum_file("Load user defined datafile")
+        if not path:
+            return
+        try:
+            if self.compare_trigger == True:
+                self.compare_data_x, self.compare_data_y, self.compare_filename = Loading.load_user(path)
+                self.compare_data_raw = pd.DataFrame({'X': self.compare_data_x, 'Y': self.compare_data_y})
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.compare_data_raw['X'] >= xmin) & (self.compare_data_raw['X'] <= xmax)
+                    self.compare_data = self.compare_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.compare_data = self.compare_data_raw.copy()
+                self.filtered_compare_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.compare_data["X"].values
+                    y_slice = self.compare_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_compare_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded user data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_compare_data = None
+                self.compare_trigger = False
+            elif self.substract_trigger == True:
+                self.substract_data_x, self.substract_data_y, self.substract_filename = Loading.load_user(path)
+                self.substract_data_raw = pd.DataFrame({'X': self.substract_data_x, 'Y': self.substract_data_y})
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.substract_data_raw['X'] >= xmin) & (self.substract_data_raw['X'] <= xmax)
+                    self.substract_data = self.substract_data_raw.loc[mask].reset_index(drop=True)
+                else:
+                    self.substract_data = self.substract_data_raw.copy()
+                    
+                x, y = Processing.substract_spectrum(self.display_data['X'], self.display_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                self.display_data = pd.DataFrame({'X':x, 'Y':y})
+                
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.dispalay_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
+                        
+                if self.compare_data is not None:
+                    x_com, y_com = Processing.substract_spectrum(self.compare_data['X'], self.compare_data['Y'], self.substract_data['X'], self.substract_data['Y'])
+                    self.compare_data = pd.DataFrame({'X':x_com, 'Y':y_com})
+                    
+                    self.filtered_compare_data = None
+                    if getattr(self, "active_filter", None) is not None:
+                        func_name, fparams = self.active_filter
+                        x_slice_com = self.compare_data["X"].values
+                        y_slice_com = self.compare_data["Y"].values
+                        try:
+                            y_filt = getattr(Filtering, func_name)(x_slice_com, y_slice_com, **fparams)
+                            self.filtered_compare_data = pd.DataFrame({"X": x_slice_com, "Y": y_filt})
+                        except Exception as fe:
+                            messagebox.showwarning(
+                                "Filter Warning",
+                                f"Could not reapply filter to loaded Horiba data:\n{fe}\n"
+                                "Showing unfiltered data instead."
+                            )
+                            self.filtered_compare_data = None
+                        
+                self.substract_trigger = False
+            else:
+                self.x_data, self.y_data, self.filename = Loading.load_user(path)
+                self.raw_data = pd.DataFrame({'X': self.x_data, 'Y': self.y_data})
+                if self.batch_xlim is not None:
+                    xmin, xmax = self.batch_xlim
+                    xmin, xmax = float(xmin), float(xmax)
+                    mask = (self.raw_data['X'] >= xmin) & (self.raw_data['X'] <= xmax)
+                    self.display_data = self.raw_data.loc[mask].reset_index(drop=True)
+                else:
+                    self.display_data = self.raw_data.copy()
+                self.filtered_data = None
+                if getattr(self, "active_filter", None) is not None:
+                    func_name, fparams = self.active_filter
+                    x_slice = self.display_data["X"].values
+                    y_slice = self.display_data["Y"].values
+                    try:
+                        y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
+                        self.filtered_data = pd.DataFrame({"X": x_slice, "Y": y_filt})
+                    except Exception as fe:
+                        messagebox.showwarning(
+                            "Filter Warning",
+                            f"Could not reapply filter to loaded user data:\n{fe}\n"
+                            "Showing unfiltered data instead."
+                        )
+                        self.filtered_data = None
+            self.update_composite_plot()
+            self.canvas.draw()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load default data: {e}")
+
 
     def open_load_window(self):
         """Popup a small window with Load Horiba / Load Witec buttons."""
@@ -481,13 +782,15 @@ class MainWindow:
             func_name, fparams = self.active_filter
             xz = self.display_data["X"].values
             yz = self.display_data["Y"].values
-            xc = self.compare_data["X"].values
-            yc = self.compare_data["Y"].values
+            if self.compare_data is not None:
+                xc = self.compare_data["X"].values
+                yc = self.compare_data["Y"].values
             try:
                 y_filt = getattr(Filtering, func_name)(xz, yz, **fparams)
                 self.filtered_data = pd.DataFrame({"X": xz, "Y": y_filt})
-                yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
-                self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
+                if self.compare_data is not None:
+                    yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
+                    self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
             except Exception as fe:
                 messagebox.showwarning(
                     "Filter Warning",
@@ -514,17 +817,20 @@ class MainWindow:
             self.display_data = self.raw_data.copy()
         if self.compare_data_raw is not None:
             self.compare_data = self.compare_data_raw.copy()
+            
         if getattr(self, "active_filter", None) is not None:
             func_name, fparams = self.active_filter
             xz = self.display_data["X"].values
             yz = self.display_data["Y"].values
-            xc = self.compare_data["X"].values
-            yc = self.compare_data["Y"].values
+            if self.compare_data is not None:
+                xc = self.compare_data["X"].values
+                yc = self.compare_data["Y"].values
             try:
                 y_filt = getattr(Filtering, func_name)(xz, yz, **fparams)
                 self.filtered_data = pd.DataFrame({"X": xz, "Y": y_filt})
-                yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
-                self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
+                if self.compare_data is not None:
+                    yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
+                    self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
             except Exception as fe:
                 messagebox.showwarning(
                     "Filter Warning",
@@ -1428,8 +1734,11 @@ class MainWindow:
         
     def compare_spectrum(self):
         #messagebox.showinfo("Compare spectrum", "Compare spectrum will be added")
+        if not hasattr(self, "display_data") or self.display_data is None:
+            messagebox.showwarning("Compare spectrum", "Load the spectrum to compare with first")
+            return
         self.compare_trigger = True
-        print("Trigger set to True")
+        # print("Trigger set to True")
         self.open_load_window()
         
     def disable_compare(self):
@@ -1451,7 +1760,429 @@ class MainWindow:
         chat_window = tk.Toplevel()
         ChatbotApp(chat_window)
         chat_window.grab_set()  # focus on this window
+        
+    def modify_user_loader(self):
+        UserLoaderConfigWindow(self.root, Loading.CONFIG_FILE)
+        
+    def spectrum_config(self):
+        PlotConfigWindow(self.root, Plotting.PLOT_CONFIG_FILE, self.update_composite_plot)
+    
+    def sub_minimum(self):
+        if not hasattr(self, "display_data") or self.display_data is None:
+            messagebox.showwarning("Substract minimum", "No spectrum to substract from")
+            return
+        try:
+            # 1) If the user has zoomed, use only the displayed subset; otherwise use full raw
+            if hasattr(self, "display_data") and self.display_data is not None:
+                self.display_data = Processing.substract_minimum(self.display_data)
+                
+            if hasattr(self, "filtered_data") and self.filtered_data is not None:
+                self.filtered_data =Processing.substract_minimum(self.filtered_data)
+                
+            if hasattr(self, "compare_data") and self.compare_data is not None:
+                self.compare_data = Processing.substract_minimum(self.compare_data)
+                
+            if hasattr(self, "filtered_compare_data") and self.filtered_compare_data is not None:
+                self.filtered_compare_data = Processing.substract_minimum(self.filtered_compare_data)
+    
+            # 4) re-plot (update_plot will now show raw vs filtered on the zoomed range)
+            self.update_composite_plot()
+    
+        except Exception as e:
+            messagebox.showerror("Filter Error", f"Could not apply filter:\n{e}")
+            
+    def sub_linear(self):
+        if not hasattr(self, "display_data") or self.display_data is None:
+            messagebox.showwarning("Linear correction", "No spectrum to substract from")
+            return
+        try:
+            # 1) If the user has zoomed, use only the displayed subset; otherwise use full raw
+            if hasattr(self, "display_data") and self.display_data is not None:
+                self.display_data = Processing.substract_linear(self.display_data)
+                
+            if hasattr(self, "filtered_data") and self.filtered_data is not None:
+                self.filtered_data = Processing.substract_linear(self.filtered_data)
+                
+            if hasattr(self, "compare_data") and self.compare_data is not None:
+                self.compare_data = Processing.substract_linear(self.compare_data)
+                
+            if hasattr(self, "filtered_compare_data") and self.filtered_compare_data is not None:
+                self.filtered_compare_data = Processing.substract_linear(self.filtered_compare_dat)
+    
+            # 4) re-plot (update_plot will now show raw vs filtered on the zoomed range)
+            self.update_composite_plot()
+    
+        except Exception as e:
+            messagebox.showerror("Filter Error", f"Could not apply filter:\n{e}")
+            
+    def sub_spectrum(self):
+        if not hasattr(self, "display_data") or self.display_data is None:
+            messagebox.showwarning("Substract spectrum", "No spectrum to substract from")
+            return
+        self.substract_trigger = True
+        # print("Trigger set to True")
+        self.open_load_window()
+        
+    def norm_spectrum(self):
+        if self.rectangle_selector and self.rectangle_selector._selection_artist:
+            self.rectangle_selector._selection_artist.remove()
+    
+        if not self.zoom_enabled:
+            self.zoom_enabled = True
+            self.span_selector = SpanSelector(
+                self.ax,
+                onselect=self._do_normalization_and_disable,
+                direction='horizontal',
+                useblit=True,
+                button=1
+            )
+            self.zoom_button.config(text="Select region")
+        else:
+            self._disable_zoom()
+    
+    def _do_normalization_and_disable(self, xmin, xmax):
 
+        self.display_data = Processing.norm_spectrum(self.display_data, xmin, xmax)
+        
+        if self.compare_data is not None:
+            self.compare_data = Processing.norm_spectrum(self.compare_data, xmin, xmax)
+    
+        if getattr(self, "active_filter", None) is not None:
+            func_name, fparams = self.active_filter
+            xz = self.display_data["X"].values
+            yz = self.display_data["Y"].values
+            if self.compare_data is not None:
+                xc = self.compare_data["X"].values
+                yc = self.compare_data["Y"].values
+            try:
+                y_filt = getattr(Filtering, func_name)(xz, yz, **fparams)
+                self.filtered_data = pd.DataFrame({"X": xz, "Y": y_filt})
+                if self.compare_data is not None:
+                    yc_filt = getattr(Filtering, func_name)(xc, yc, **fparams)
+                    self.filtered_compare_data = pd.DataFrame({"X": xc, "Y": yc_filt})
+            except Exception as fe:
+                messagebox.showwarning(
+                    "Filter Warning",
+                    f"Could not reapply filter '{func_name}' on zoomed region:\n{fe}\n"
+                    "Showing unfiltered data instead."
+                )
+                self.filtered_data = None
+                self.filtered_compare_data = None
+    
+        # 4) Redraw everything via the unified plot routine
+        self.update_composite_plot()
+        self.canvas.draw()
+    
+        # 5) Turn zoom off
+        self._disable_zoom()
+        
+    def batch_sub_min(self):
+        self.disable_compare()
+        self.disable_filter()
+        """Batch process spectra: subtract minimum and save results."""
+    
+        # --- Step 1: Choose loader type ---
+        win = tk.Toplevel(self.root)
+        win.title("Batch Subtract Minimum")
+        win.geometry("260x180")
+        win.transient(self.root)
+        win.grab_set()
+    
+        def proceed(loader_func, limits):
+            win.destroy()
+    
+            # --- Step 2: Select input directory ---
+            in_dir = filedialog.askdirectory(title="Select Input Directory with Spectra")
+            if not in_dir:
+                return
+    
+            # --- Step 3: Select output directory ---
+            out_dir = filedialog.askdirectory(title="Select Output Directory for Processed Spectra")
+            if not out_dir:
+                return
+    
+            # --- Step 4: Iterate over spectra ---
+            for fname in os.listdir(in_dir):
+                fpath = os.path.join(in_dir, fname)
+    
+                # Skip non-txt files (you may refine this condition)
+                if not fname.lower().endswith(".txt"):
+                    continue
+    
+                try:
+                    # Load data
+                    df, _ = loader_func(fpath, limits)
+    
+                    self.display_data = Processing.substract_minimum(df)
+    
+                    # Construct output filename
+                    base, ext = os.path.splitext(fname)
+                    out_fname = f"{base}_min_sub{ext}"
+                    out_fpath = os.path.join(out_dir, out_fname)
+    
+                    # Save result (re-uses your save_spectrum method)
+                    with open(out_fpath, "w", encoding="utf-8") as f:
+                        for x, y in zip(self.display_data["X"], self.display_data["Y"]):
+                            f.write(f"{x}\t{y}\n")
+    
+                except Exception as e:
+                    messagebox.showerror("Batch Error", f"Error processing {fname}:\n{e}")
+    
+            messagebox.showinfo("Batch Done", f"Processed spectra saved to:\n{out_dir}")
+    
+        # Buttons for loader selection
+        ttk.Button(win, text="Batch Horiba format", 
+                   command=lambda: proceed(Loading.load_horiba_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch Witec format", 
+                   command=lambda: proceed(Loading.load_witec_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch default format", 
+                   command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch user defined format", 
+                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        
+    def batch_sub_linear(self):
+        self.disable_compare()
+        self.disable_filter()
+        """Batch process spectra: subtract linear profile."""
+    
+        # --- Step 1: Choose loader type ---
+        win = tk.Toplevel(self.root)
+        win.title("Batch Subtract Linear")
+        win.geometry("260x180")
+        win.transient(self.root)
+        win.grab_set()
+    
+        def proceed(loader_func, limits):
+            win.destroy()
+    
+            # --- Step 2: Select input directory ---
+            in_dir = filedialog.askdirectory(title="Select Input Directory with Spectra")
+            if not in_dir:
+                return
+    
+            # --- Step 3: Select output directory ---
+            out_dir = filedialog.askdirectory(title="Select Output Directory for Processed Spectra")
+            if not out_dir:
+                return
+    
+            # --- Step 4: Iterate over spectra ---
+            for fname in os.listdir(in_dir):
+                fpath = os.path.join(in_dir, fname)
+    
+                # Skip non-txt files (you may refine this condition)
+                if not fname.lower().endswith(".txt"):
+                    continue
+    
+                try:
+                    # Load data
+                    df, _ = loader_func(fpath, limits)
+    
+                    self.display_data = Processing.substract_linear(df)
+    
+                    # Construct output filename
+                    base, ext = os.path.splitext(fname)
+                    out_fname = f"{base}_linear_sub{ext}"
+                    out_fpath = os.path.join(out_dir, out_fname)
+    
+                    # Save result (re-uses your save_spectrum method)
+                    with open(out_fpath, "w", encoding="utf-8") as f:
+                        for x, y in zip(self.display_data["X"], self.display_data["Y"]):
+                            f.write(f"{x}\t{y}\n")
+    
+                except Exception as e:
+                    messagebox.showerror("Batch Error", f"Error processing {fname}:\n{e}")
+    
+            messagebox.showinfo("Batch Done", f"Processed spectra saved to:\n{out_dir}")
+    
+        # Buttons for loader selection
+        ttk.Button(win, text="Batch Horiba format", 
+                   command=lambda: proceed(Loading.load_horiba_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch Witec format", 
+                   command=lambda: proceed(Loading.load_witec_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch default format", 
+                   command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch user defined format", 
+                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        
+    def batch_sub_spectrum(self):
+        
+        if not hasattr(self, 'display_data') or self.display_data.empty:
+            messagebox.showwarning("No data to substract", "Please, open the spectrum which you want to batch substract (and focused on the region of interest)")
+            return
+        
+        self.substract_data = self.display_data
+        
+        self.disable_compare()
+        self.disable_filter()
+    
+        # --- Step 1: Choose loader type ---
+        win = tk.Toplevel(self.root)
+        win.title("Batch Subtract Linear")
+        win.geometry("260x180")
+        win.transient(self.root)
+        win.grab_set()
+    
+        def proceed(loader_func, limits):
+            win.destroy()
+    
+            # --- Step 2: Select input directory ---
+            in_dir = filedialog.askdirectory(title="Select Input Directory with Spectra")
+            if not in_dir:
+                return
+    
+            # --- Step 3: Select output directory ---
+            out_dir = filedialog.askdirectory(title="Select Output Directory for Processed Spectra")
+            if not out_dir:
+                return
+    
+            # --- Step 4: Iterate over spectra ---
+            for fname in os.listdir(in_dir):
+                fpath = os.path.join(in_dir, fname)
+    
+                # Skip non-txt files (you may refine this condition)
+                if not fname.lower().endswith(".txt"):
+                    continue
+    
+                try:
+                    # Load data
+                    df, _ = loader_func(fpath, limits)
+                    
+                    x, y = Processing.substract_spectrum(df['X'], df['Y'], self.substract_data['X'], self.substract_data['Y'])
+    
+                    result = pd.DataFrame({'X':x, 'Y':y})
+    
+                    # Construct output filename
+                    base, ext = os.path.splitext(fname)
+                    out_fname = f"{base}_spectrum_sub{ext}"
+                    out_fpath = os.path.join(out_dir, out_fname)
+    
+                    # Save result (re-uses your save_spectrum method)
+                    with open(out_fpath, "w", encoding="utf-8") as f:
+                        for x, y in zip(result["X"], result["Y"]):
+                            f.write(f"{x}\t{y}\n")
+    
+                except Exception as e:
+                    messagebox.showerror("Batch Error", f"Error processing {fname}:\n{e}")
+    
+            messagebox.showinfo("Batch Done", f"Processed spectra saved to:\n{out_dir}")
+    
+        # Buttons for loader selection
+        ttk.Button(win, text="Batch Horiba format", 
+                   command=lambda: proceed(Loading.load_horiba_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch Witec format", 
+                   command=lambda: proceed(Loading.load_witec_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch default format", 
+                   command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch user defined format", 
+                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        
+    def batch_norm(self):
+        """Start batch normalization by letting user pick a normalization region."""
+        if self.display_data is None or self.display_data.empty:
+            messagebox.showwarning("Warning", "Load at least one spectrum to define normalization region.")
+            return
+        
+        if self.batch_xlim is None:
+            self.batch_xlim = (self.display_data['X'].min(), self.display_data['X'].max())
+    
+        # Enable region selection with SpanSelector
+        if not self.zoom_enabled:
+            self.zoom_enabled = True
+            self.span_selector = SpanSelector(
+                self.ax,
+                onselect=self._do_batch_norm_and_disable,
+                direction="horizontal",
+                useblit=True,
+                button=1
+            )
+            self.zoom_button.config(text="Select region")
+        else:
+            self._disable_zoom()
+
+
+    def _do_batch_norm_and_disable(self, xmin, xmax):
+        """Store normalization limits and start the batch procedure."""
+        self.batch_norm_region = (xmin, xmax)   # <-- normalization region only
+    
+        # disable interactive tools
+        self._disable_zoom()
+        if self.rectangle_selector and self.rectangle_selector._selection_artist:
+            self.rectangle_selector._selection_artist.remove()
+    
+        # now launch the batch normalization dialog
+        self._batch_norm_dialog()
+    
+    
+    def _batch_norm_dialog(self):
+        """Batch normalize all spectra in a folder using selected region."""
+        win = tk.Toplevel(self.root)
+        win.title("Batch Normalize Spectra")
+        win.geometry("260x180")
+        win.transient(self.root)
+        win.grab_set()
+    
+        norm_xmin, norm_xmax = self.batch_norm_region  # normalization region
+    
+        def proceed(loader_func, limits):
+            win.destroy()
+    
+            in_dir = filedialog.askdirectory(title="Select Input Directory with Spectra")
+            if not in_dir:
+                return
+    
+            out_dir = filedialog.askdirectory(title="Select Output Directory for Normalized Spectra")
+            if not out_dir:
+                return
+    
+            for fname in os.listdir(in_dir):
+                fpath = os.path.join(in_dir, fname)
+                if not fname.lower().endswith(".txt"):
+                    continue
+    
+                try:
+                    # Load spectrum (may crop if limits are passed)
+                    df, _ = loader_func(fpath, limits)
+    
+                    # Check that spectrum covers normalization region
+                    if df["X"].min() > norm_xmin or df["X"].max() < norm_xmax:
+                        messagebox.showwarning(
+                            "Warning",
+                            f"Skipping {fname}: does not cover normalization region {norm_xmin}–{norm_xmax}."
+                        )
+                        continue
+    
+                    # Normalize
+                    df_norm = Processing.norm_spectrum(df, norm_xmin, norm_xmax)
+    
+                    # Save with suffix
+                    base, ext = os.path.splitext(fname)
+                    out_fname = f"{base}_norm{ext}"
+                    out_fpath = os.path.join(out_dir, out_fname)
+    
+                    with open(out_fpath, "w", encoding="utf-8") as f:
+                        for x, y in zip(df_norm["X"], df_norm["Y"]):
+                            f.write(f"{x}\t{y}\n")
+    
+                except Exception as e:
+                    messagebox.showerror("Batch Error", f"Error processing {fname}:\n{e}")
+    
+            messagebox.showinfo("Batch Done", f"Normalized spectra saved to:\n{out_dir}")
+    
+        # Buttons for loader selection
+        ttk.Button(win, text="Batch Horiba format",
+                   command=lambda: proceed(Loading.load_horiba_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch Witec format",
+                   command=lambda: proceed(Loading.load_witec_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch default format",
+                   command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch user defined format",
+                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+
+    
+    def show_message(self):
+        
+        messagebox.showinfo("Info", "This function is not ready yet")
+        
     def run(self):
         self.root.mainloop()
 

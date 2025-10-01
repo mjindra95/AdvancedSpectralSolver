@@ -23,7 +23,8 @@ from tkinter import filedialog
 import glob
 import os
 import re
-from joblib import Parallel, delayed
+#from joblib import Parallel, delayed
+import json
 
 class Loading:
     def __init__(self, example):
@@ -70,6 +71,23 @@ class Loading:
         raise ValueError(f'Could not read file with any known encoding: {encodings_to_try}')
 
     
+    def load_horiba_folder(path, batch_xlim):
+        try:
+            x_data, y_data, filename = Loading.load_horiba(path)
+            raw_data = pd.DataFrame({'X': x_data, 'Y': y_data})
+            if batch_xlim is not None:
+                xmin, xmax = batch_xlim
+                xmin, xmax = float(xmin), float(xmax)
+                mask = (raw_data['X'] >= xmin) & (raw_data['X'] <= xmax)
+                display_data = raw_data.loc[mask].reset_index(drop=True)
+            else:
+                display_data = raw_data.copy()
+            # self.update_composite_plot()
+            # self.canvas.draw()
+        except Exception:
+            print(f'File {filename} was not load')
+        return display_data, filename
+    
     @staticmethod
     def load_witec(file_path):
         """
@@ -102,6 +120,23 @@ class Loading:
                 continue
         raise ValueError(f'Could not read file with any known encoding: {encodings_to_try}')
         
+    def load_witec_folder(path, batch_xlim):
+        try:
+            x_data, y_data, filename = Loading.load_witec(path)
+            raw_data = pd.DataFrame({'X': x_data, 'Y': y_data})
+            if batch_xlim is not None:
+                xmin, xmax = batch_xlim
+                xmin, xmax = float(xmin), float(xmax)
+                mask = (raw_data['X'] >= xmin) & (raw_data['X'] <= xmax)
+                display_data = raw_data.loc[mask].reset_index(drop=True)
+            else:
+                display_data = raw_data.copy()
+            # self.update_composite_plot()
+            # self.canvas.draw()
+        except Exception:
+            print(f'File {filename} was not load')
+        return display_data, filename
+
     @staticmethod
     def load_default(file_path):
         """
@@ -131,7 +166,94 @@ class Loading:
             except Exception:
                 continue
         raise ValueError(f'Could not read file with any known encoding: {encodings_to_try}')
-        
+
+    def load_default_folder(path, batch_xlim):
+        try:
+            x_data, y_data, filename = Loading.load_default(path)
+            raw_data = pd.DataFrame({'X': x_data, 'Y': y_data})
+            if batch_xlim is not None:
+                xmin, xmax = batch_xlim
+                xmin, xmax = float(xmin), float(xmax)
+                mask = (raw_data['X'] >= xmin) & (raw_data['X'] <= xmax)
+                display_data = raw_data.loc[mask].reset_index(drop=True)
+            else:
+                display_data = raw_data.copy()
+            # self.update_composite_plot()
+            # self.canvas.draw()
+        except Exception:
+            print(f'File {filename} was not load')
+        return display_data, filename    
+
+    CONFIG_FILE = os.path.join("ASS", "user_loader.json")
+    
+    @staticmethod
+    def load_user(file_path):
+        """
+        Loads data based on user-defined structure in JSON config.
+        """
+        if not os.path.exists(Loading.CONFIG_FILE):
+            raise FileNotFoundError(f"No config found at {Loading.CONFIG_FILE}")
+ 
+        # Load config
+        with open(Loading.CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+ 
+        try:
+            file_type = config["file_type"]
+            # print(f'Filetype: {file_type} as {type(file_type)}')
+            
+        except KeyError as e:
+            raise ValueError(f"Missing required key in config: {e}")
+
+        filename = os.path.basename(file_path)
+ 
+        try:
+            if file_type == "csv" or file_type == "txt":
+                
+                df = pd.read_csv(
+                    file_path,
+                    skiprows=config["skip_rows"],
+                    usecols=config["usecols"],
+                    sep=config["separator"],
+                    header=None,
+                    names=["X", "Y"],
+                    encoding=config["encoding"], 
+                    engine = 'python'
+                )
+
+            elif file_type == "xlsx":
+                df = pd.read_excel(
+                    file_path,
+                    skiprows=config["skip_rows"],
+                    usecols=config["usecols"],
+                    names=['X', 'Y'],
+                    header=None
+                )
+            else:
+                raise ValueError(f"Unsupported file type: {file_type}")
+ 
+            return df["X"].values, df["Y"].values, filename
+ 
+        except Exception as e:
+            raise ValueError(f"Could not load file {filename}: {e}")
+            
+    def load_user_folder(path, batch_xlim):
+        try:
+            x_data, y_data, filename = Loading.load_user(path)
+            raw_data = pd.DataFrame({'X': x_data, 'Y': y_data})
+            if batch_xlim is not None:
+                xmin, xmax = batch_xlim
+                xmin, xmax = float(xmin), float(xmax)
+                mask = (raw_data['X'] >= xmin) & (raw_data['X'] <= xmax)
+                display_data = raw_data.loc[mask].reset_index(drop=True)
+            else:
+                display_data = raw_data.copy()
+            # self.update_composite_plot()
+            # self.canvas.draw()
+        except Exception:
+            print(f'File {filename} was not load')
+        return display_data, filename
+    
     @staticmethod
     def load_witec_map(txt_path: str):
         # 1) Read header (# lines) to grab metadata and count skiprows
@@ -833,13 +955,102 @@ class Processing:
             df_result.index.name = df_raw.index.name
     
         return df_result
+    
+    def substract_minimum(df):
+        x = df['X']
+        y = df['Y']
+        y_sub = y - y.min()
+        return pd.DataFrame({'X':x, 'Y':y_sub})
+
+    def substract_linear(df):
+        """
+
+        Parameters
+        ----------
+        df : DataFrame
+            DataFrame with input data, must have columns ['X', 'Y']
+
+        Returns
+        -------
+        DataFrame
+            DataFrame with substracted linear background from ['Y'] (calculated from first and last point)
+
+        """
+        x = df['X']
+        y = df['Y']
+        slope = (y.iloc[-1] - y.iloc[0]) / (x.iloc[-1] - x.iloc[0])
+        intercept = y.iloc[0] - slope * x.iloc[0]
+        linear = slope*x + intercept
+        y_corr = y - linear
+        return pd.DataFrame({'X':x, 'Y':y_corr})
+        
+    def substract_spectrum(x1, y1, x2, y2):
+        x1, y1 = np.asarray(x1), np.asarray(y1)
+        x2, y2 = np.asarray(x2), np.asarray(y2)
+    
+        # --- Case 1: Identical x-axes
+        if np.array_equal(x1, x2):
+            return x1, y1 - y2
+    
+        # --- Case 2: Different x-axes
+        # Find overlapping region
+        x_min = max(x1.min(), x2.min())
+        x_max = min(x1.max(), x2.max())
+        if x_min >= x_max:
+            raise ValueError("No overlap between the two spectra.")
+    
+        # Restrict to overlap
+        mask1 = (x1 >= x_min) & (x1 <= x_max)
+        mask2 = (x2 >= x_min) & (x2 <= x_max)
+        x1_overlap, y1_overlap = x1[mask1], y1[mask1]
+        x2_overlap, y2_overlap = x2[mask2], y2[mask2]
+    
+        # Decide which to interpolate (the one with fewer points)
+        if len(x1_overlap) <= len(x2_overlap):
+            # Interpolate y2 onto x1
+            y2_interp = np.interp(x1_overlap, x2_overlap, y2_overlap)
+            return x1_overlap, y1_overlap - y2_interp
+        else:
+            # Interpolate y1 onto x2
+            y1_interp = np.interp(x2_overlap, x1_overlap, y1_overlap)
+            return x2_overlap, y1_interp - y2_overlap
+        
+    def norm_spectrum(df, x_min, x_max):
+        """
+        Parameters
+        ----------
+        df : DataFrame
+            DataFrame with input data, must have columns ['X', 'Y']
+        x_min : integer
+            lower cutoff of the normalization region
+        x_max : integer
+            upper cutoff of the normalization region
+
+        Returns
+        -------
+        DataFrame with normalized data
+        """
+        x = df['X']
+        y = df['Y']
+        
+        mask = (x >= x_min) & (x <= x_max)
+        
+        region = y.loc[mask].reset_index(drop=True)
+        y_norm = y/region.max()
+        
+        return pd.DataFrame({'X':x, 'Y':y_norm})
 
 class Plotting:
     def __init__(self, data):
         self.data = data
-           
-    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state, filtered_compare_data):
 
+    PLOT_CONFIG_FILE = os.path.join("ASS", "plot_config.json")
+
+    def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state, filtered_compare_data):
+        # Load config
+        with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+            
         fig.clear()
 
         x = data['X'].values
@@ -884,36 +1095,40 @@ class Plotting:
                             ax_bott_right.plot(x_dense, y_comp, '--', label=f'{name}{counter}', alpha=0.8)
                         else:
                             ax_bott_right.plot(x_dense, y_comp, '--', label=label, alpha=0.8)
-            ax_bott_right.set_ylabel('Intensity (arb. u.)')
+            ax_bott_right.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
             if filtered_data is not None:
-                ax_bott_left.plot(x, y, linestyle = 'dotted', color='black', label=f'{filename} (raw)')
-                ax_bott_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=f'{filename} filtered')
+                ax_bott_left.plot(x, y, linestyle = 'dotted', color='black', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
+                ax_bott_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (filtered)")
             else:
-                ax_bott_left.scatter(x, y, s=5, color='blue', label=f'{filename} (raw)')
+                ax_bott_left.scatter(x, y, s=5, color='blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
                 
             if compare_data is not None:
-                ax_bott_left.plot(compare_data["X"].values, compare_data["Y"].values, color='green', label=f'{compare_filename} (raw)')
+                ax_bott_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"], color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)")
             
             ax_bott_left.plot(x_dense, composite, '-', color='red', label='Composite')
-            
-            if y.max() > composite.max():
-                y_max = y.max()
-            else:
-                y_max = composite.max()
+            #1
+            # if y.max() > composite.max():
+            #     y_max = y.max()
+            # else:
+            #     y_max = composite.max()
+            #2    
+            y_max = max(y.max(), composite.max())
                 
-            if y.min() < composite.min():
-                y_min = y.min()
-            else:
-                y_min = composite.min()
+            # if y.min() < composite.min():
+            #     y_min = y.min()
+            # else:
+            #     y_min = composite.min()
+            
+            y_min = min(y.min(), composite.min())
                 
             diff = y_max - y_min
             ax_bott_right.set_ylim(0-0.05*diff, diff + 0.05*diff)
             ax_bott_left.set_ylim(y_min-0.05*diff, y_max + 0.05*diff)
-            ax_bott_right.set_ylabel('Intensity (arb. u.)') 
+            ax_bott_right.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)") 
             ax_bott_left.legend(loc='upper left')
             ax_bott_right.legend(loc='upper right')
-            ax_bott_left.set_xlabel(r'Raman shift (cm$^{-1}$)')
-            ax_bott_left.set_ylabel('Intensity (arb. u.)')
+            ax_bott_left.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
+            ax_bott_left.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
             
             if filtered_data is not None:
                 residual = filtered_data["Y"] - composite_at_x
@@ -925,22 +1140,29 @@ class Plotting:
             ax_top.axhline(0, color='red', linestyle='--', linewidth=0.8)
             ax_top.set_ylabel("Residual")
             ax_top.tick_params(axis='x', labelbottom=False) 
+            if config["Title"] is not None:
+                ax_top.set_title(config["Title"])
         else:
             ax_left  = fig.add_subplot(111)
             if filtered_data is not None:
-                ax_left.plot(x, y, linestyle = 'dotted', color = 'blue', label=f'{filename} (raw)', alpha = 0.5)
-                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=f'{filename} (filtered)')
+                ax_left.plot(x, y, linestyle = 'dotted', color = 'blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)", alpha = 0.5)
+                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (filtered)")
             else:
-                ax_left.plot(x, y, color = 'blue', label=f'{filename} (raw)')
+                ax_left.plot(x, y, color = 'blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
             if compare_data is not None:
                 if filtered_compare_data is not None:
-                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values, linestyle = 'dotted', color = 'green', label=f'{compare_filename} (raw)', alpha = 0.5)
-                    ax_left.plot(filtered_compare_data["X"].values, filtered_compare_data["Y"].values, color='green', label=f'{compare_filename} (filtered)')
+                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"],
+                                 linestyle = 'dotted', color = 'green', 
+                                 label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)", alpha = 0.5)
+                    ax_left.plot(filtered_compare_data["X"].values, filtered_compare_data["Y"].values + config["Compare offset"],
+                                 color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (filtered)")
                 else:
-                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values, color='green', label=f'{compare_filename} (raw)')
+                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"], color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)")
             ax_left.legend(loc='best')
-            ax_left.set_xlabel(r'Raman shift (cm$^{-1}$)')
-            ax_left.set_ylabel('Intensity (arb. u.)')
+            ax_left.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
+            ax_left.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
+            if config["Title"] is not None:
+                ax_left.set_title(config["Title"])
             
     def lin_bcg(row):
         xs = row.index.to_numpy().astype(float)
@@ -984,7 +1206,10 @@ class Plotting:
         title : str, optional
             Plot title.
         """
-
+        # Load config
+        with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+            
         # 0) grab the figure & clear everything
         fig = ax.get_figure()
         fig.clear()
@@ -1041,8 +1266,8 @@ class Plotting:
 
         # 10) decorate axes
         ax.set_xlim(low_sh, high_sh)
-        ax.set_xlabel(r"Raman shift (cm$^{-1}$)")
-        ax.set_ylabel("Intensity (a.u.)")
+        ax.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
+        ax.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
 
         # 11) tighten up
         fig.tight_layout()
@@ -1056,6 +1281,10 @@ class Plotting:
                     orientation, mode,
                     interpolation):
 
+        # Load config
+        with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        
         shifts = df.columns.to_numpy().astype(float)
                     
         # Find the columns (shifts) within the specified range
@@ -1109,9 +1338,9 @@ class Plotting:
             "SEC": "Potential (mV)"
         }
         ax.set_ylabel(ylabels.get(mode, ""))
-        ax.set_xlabel(r"Raman shift (cm$^{-1}$)")
+        ax.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
         
-        fig.colorbar(img, ax=ax, label="Intensity (a.u.)")
+        fig.colorbar(img, ax=ax, label=config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
         return ax, Data_df
         
     @staticmethod
