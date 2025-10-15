@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun  5 21:44:30 2025
-
-@author: marti
+ASS Interafce for analysis of 2D maps
+Author: Martin Jindra
 """
 
 import os
@@ -87,7 +86,7 @@ class Map_2D(tk.Toplevel):
         # Source + Load
         ttk.Label(right, text="Source:").grid(row=row, column=0, sticky="w")
         ttk.Combobox(right, textvariable=self.source_var,
-                     values=["Witec file","Horiba split", "Horiba file"], state="readonly")\
+                     values=["Witec file","Horiba split", "Horiba file", "Default split"], state="readonly")\
            .grid(row=row+1, column=0, sticky="ew", pady=(0,10))
         row = row+1
         ttk.Button(right, text="Load", command=self._on_load)\
@@ -256,7 +255,7 @@ class Map_2D(tk.Toplevel):
                 parent=self
             )
             
-        elif source == "Horiba split":
+        elif source == "Horiba split" or "Default split":
             folder = filedialog.askdirectory(parent = self, title="Select folder with .txt split spectra")
             if not folder:
                 return
@@ -269,8 +268,8 @@ class Map_2D(tk.Toplevel):
             self.df2d = df_raw
             self.map_meta   = None
             
-            shift_low = self.df2d['X-Axis'].iloc[0]
-            shift_high = self.df2d['X-Axis'].iloc[-1]
+            shift_low = self.df2d['X-Axis'].min()
+            shift_high = self.df2d['X-Axis'].max()
             
             self.lower_shift.set(shift_low)
             self.upper_shift.set(shift_high)

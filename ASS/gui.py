@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 11 15:19:48 2025
-
-@author: Martin Jindra
+GUI of the main window of ASS
+Author: Martin Jindra
 """
 
 import tkinter as tk
@@ -27,6 +26,7 @@ from ASS.excel_plotter import ExcelPlotWindow
 from ASS.chatbot import ChatbotApp
 from ASS.user_loader import UserLoaderConfigWindow
 from ASS.plot_config import PlotConfigWindow
+from ASS.pca import open_pca_window
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -102,22 +102,23 @@ class MainWindow:
         menubar.add_cascade(label="File", menu=file_menu)
         
         spectrum_menu = tk.Menu(menubar, tearoff=0)
-        # spectrum_menu.add_command(label = "Update plot", command=self.update_composite_plot)
-        # spectrum_menu.add_separator()
+        spectrum_menu.add_command(label = "Update plot", command=self.update_composite_plot)
+        spectrum_menu.add_separator()
         spectrum_menu.add_command(label="Compare spectrum", command=self.compare_spectrum)
         spectrum_menu.add_command(label="Delete compare", command=self.disable_compare)
         spectrum_menu.add_separator()
+        spectrum_menu.add_command(label = "Spectrum filtering", command=self.open_filter_window)
         spectrum_menu.add_command(label = "Substract minimum", command=self.sub_minimum)
         spectrum_menu.add_command(label = "Linear correction", command=self.sub_linear)
         spectrum_menu.add_command(label = "Substract spectrum", command=self.sub_spectrum)
         spectrum_menu.add_command(label = "Normalize spectrum", command=self.norm_spectrum)
         spectrum_menu.add_separator()
+        spectrum_menu.add_command(label = "Batch filtering", command=self.batch_filtering)
         spectrum_menu.add_command(label = "Batch minimum substraction", command=self.batch_sub_min)
         spectrum_menu.add_command(label = "Batch linear correction", command=self.batch_sub_linear)
         spectrum_menu.add_command(label = "Batch spectrum substration", command=self.batch_sub_spectrum)
         spectrum_menu.add_command(label = "Batch spectrum normalization", command=self.batch_norm)
         spectrum_menu.add_separator()
-        # spectrum_menu.add_command(label="Spectrum operation", command=self.spectrum_operation)
         spectrum_menu.add_command(label="Save spectrum", command = self.save_spectrum)
         spectrum_menu.add_command(label="Save plot", command = self.save_plot)
         spectrum_menu.add_command(label="Save all data", command = self.save_data)
@@ -142,15 +143,12 @@ class MainWindow:
         menubar.add_cascade(label="Model", menu=model_menu)
 
         advanced_menu = tk.Menu(menubar, tearoff=0)
-        advanced_menu.add_command(label="Filtering", command=self.open_filter_window)
         advanced_menu.add_command(label="Excel plot", command = self.excel_plot)
-        advanced_menu.add_command(label="PCA", command = self.show_message)
+        advanced_menu.add_command(label="PCA", command = self.pca_dialog)
         advanced_menu.add_separator()
         advanced_menu.add_command(label="Batch analysis", command=self.batch_fit)
         advanced_menu.add_command(label="1D Map analysis", command=self.map_1D)
         advanced_menu.add_command(label="2D Map analysis", command=self.map_2D)
-        # advanced_menu.add_separator()
-        # advanced_menu.add_command(label="Open chat", command = self.open_chat)
         menubar.add_cascade(label="Advanced", menu=advanced_menu)
 
         about_menu = tk.Menu(menubar, tearoff=0)
@@ -1475,6 +1473,7 @@ class MainWindow:
 
             # Build a DataFrame for the slice (raw)
             self.display_data = pd.DataFrame({"X": x_slice, "Y": y_slice})
+            self.filename = basename
 
             # 6b) If a filter is active, reapply it to this slice
             if self.active_filter is not None:
@@ -1584,6 +1583,7 @@ class MainWindow:
             return
         if not hasattr(self, 'batch_xlim'):
             messagebox.showwarning("Batch Fit", "Zoom into the spectral region of interest")
+            # self.batch_xlim = self.display_data['X'].min(), self.display_data['X'].max()
             return
 
         # 2) Let user pick which loader via a modal Toplevel
@@ -1605,6 +1605,9 @@ class MainWindow:
            .pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(win, text="Default spectra",
                    command=lambda: choose(Loading.load_default))\
+           .pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="User spectra",
+                   command=lambda: choose(Loading.load_user))\
            .pack(fill=tk.X, padx=10, pady=5)
 
     def show_about(self):
@@ -1692,7 +1695,7 @@ class MainWindow:
                     "Showing unfiltered data instead."
                 )
                 self.filtered_data = None
-        
+        self.filename = 'Extracted spectrum'
         self.update_composite_plot()
     
         # 5) finally, push it onto the canvas
@@ -1724,7 +1727,7 @@ class MainWindow:
                     "Showing unfiltered data instead."
                 )
                 self.filtered_data = None
-        
+        self.filename = 'Extracted spectrum'
         self.update_composite_plot()
     
         self.canvas.draw()
@@ -2178,6 +2181,82 @@ class MainWindow:
         ttk.Button(win, text="Batch user defined format",
                    command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
 
+    def batch_filtering(self):
+        """Batch process spectra with the currently active filter."""
+    
+        # Ensure a filter is defined
+        if not hasattr(self, "active_filter") or self.active_filter is None:
+            messagebox.showwarning("No active filter", "No filter defined, please select the filter and its parameters")
+            return
+    
+        self.disable_compare()
+    
+        # Unpack active filter
+        func_name, params = self.active_filter
+    
+        # --- Step 1: Choose loader type ---
+        win = tk.Toplevel(self.root)
+        win.title("Batch Filtering")
+        win.geometry("260x180")
+        win.transient(self.root)
+        win.grab_set()
+    
+        def proceed(loader_func, limits):
+            win.destroy()
+    
+            # --- Step 2: Select input directory ---
+            in_dir = filedialog.askdirectory(title="Select Input Directory with Spectra")
+            if not in_dir:
+                return
+    
+            # --- Step 3: Select output directory ---
+            out_dir = filedialog.askdirectory(title="Select Output Directory for Filtered Spectra")
+            if not out_dir:
+                return
+    
+            # --- Step 4: Iterate over spectra ---
+            for fname in os.listdir(in_dir):
+                fpath = os.path.join(in_dir, fname)
+    
+                if not fname.lower().endswith(".txt"):
+                    continue
+    
+                try:
+                    # Load spectrum
+                    df, _ = loader_func(fpath, limits)
+                    x_src = df["X"].values
+                    y_src = df["Y"].values
+    
+                    # Apply the active filter
+                    y_filt = getattr(Filtering, func_name)(x_src, y_src, **params)
+                    df_filt = pd.DataFrame({"X": x_src, "Y": y_filt})
+    
+                    # Save with suffix
+                    base, ext = os.path.splitext(fname)
+                    out_fname = f"{base}_filtered{ext}"
+                    out_fpath = os.path.join(out_dir, out_fname)
+    
+                    with open(out_fpath, "w", encoding="utf-8") as f:
+                        for x, y in zip(df_filt["X"], df_filt["Y"]):
+                            f.write(f"{x}\t{y}\n")
+    
+                except Exception as e:
+                    messagebox.showerror("Batch Error", f"Error processing {fname}:\n{e}")
+    
+            messagebox.showinfo("Batch Done", f"Filtered spectra saved to:\n{out_dir}")
+    
+        # Buttons for loader selection
+        ttk.Button(win, text="Batch Horiba format",
+                   command=lambda: proceed(Loading.load_horiba_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch Witec format",
+                   command=lambda: proceed(Loading.load_witec_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch default format",
+                   command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(win, text="Batch user defined format",
+                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+
+    def pca_dialog(self):
+        open_pca_window(self.root)
     
     def show_message(self):
         

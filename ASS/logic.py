@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 11 15:19:04 2025
-
-@author: Martin Jindra
-
-this file contains all of he logical processes which are necesseary for Advanced Specral Solver app
+Logic for the main functionalities of ASS
+Author: Martin Jindra
 """
 import os
 import pandas as pd
@@ -106,7 +103,7 @@ class Loading:
             try:
                 data = pd.read_csv(
                     file_path,
-                    skiprows=36,
+                    skiprows=17,
                     usecols=[0, 1],
                     sep=r'\s+',
                     header=None,
@@ -357,6 +354,8 @@ class Loading:
                             file, usecols=(0, 1), comments="#",
                             encoding=enc, unpack=True
                         )
+                        order = np.argsort(shift)
+                        shift, intensity = shift[order], intensity[order]
                         correct_encoding = enc
                         break
                     except Exception:
@@ -370,6 +369,8 @@ class Loading:
                         file, usecols=(0, 1), comments="#",
                         encoding=correct_encoding, unpack=True
                     )
+                    order = np.argsort(shift)
+                    shift, intensity = shift[order], intensity[order]
                 except Exception:
                     print(f"File {file} failed to load with {correct_encoding}")
                     continue
@@ -429,18 +430,27 @@ class Loading:
     
         for fp in files:
             # 1) try to load columns 0,1 skipping 40 rows under various encodings
-            data = None
-            for enc in encodings:
-                try:
-                    data = np.loadtxt(fp, usecols=(0,1),
-                                      skiprows=40, encoding=enc)
-                    break
-                except Exception:
-                    continue
-            if data is None:
-                raise ValueError(f"Could not read {fp} with any of {encodings}")
+            # data = None
+            # for enc in encodings:
+            #     try:
+            #         data = np.loadtxt(fp, usecols=(0,1), skiprows=40, encoding=enc)
+            #         break
+            #     except Exception:
+            #         continue
+            # if data is None:
+            #     raise ValueError(f"Could not read {fp} with any of {encodings}")
     
-            shift, intensity = data[:,0], data[:,1]
+            # shift, intensity = data[:,0], data[:,1]
+        
+            try:
+                shift, intensity, filename = Loading.load_horiba(fp)
+                # break
+            except Exception:
+                print(f"⚠️  Skipping {fp}, failed to load via Horiba loader")
+                continue
+            # if data is None:
+            #     raise ValueError(f"Could not read {fp} with any of {encodings}")
+    
     
             # 2) On the first file, establish the shift‐axis and empty DataFrame
             if shift_values is None:
@@ -467,17 +477,30 @@ class Loading:
                 else:
                     print(f"⚠️  {base} skipped: no “mV” tag found")
                     continue
+                
+            elif mode.upper() == "TIMEINDEX":
+                m = re.search(r"Time(\d+)", base)
+                if m:
+                    key = float(m.group(1))
+                else:
+                    print(f"⚠️  {base} skipped: no “mV” tag found")
+                    continue
     
             elif mode.upper() == "TIMESCAN":
                 key = None
-                with open(fp, encoding=enc) as f:
-                    for line in f:
-                        if line.startswith("#Time"):
-                            try:
-                                key = float(line.split("=",1)[1])
-                            except:
-                                pass
-                            break
+                for enc in encodings:
+                    try:
+                        with open(fp, encoding=enc) as file:
+                            for line in file:
+                                if line.startswith("#Time"):
+                                    try:
+                                        key = float(line.split("=",1)[1])
+                                    except:
+                                        pass
+                                    break
+                        break # if succeded
+                    except UnicodeDecodeError:
+                        continue
                 if key is None:
                     print(f"⚠️  {base} skipped: no #Time=… in header")
                     continue
@@ -540,23 +563,175 @@ class Loading:
     
         df = None
         shift_values = None
-        encodings    = ['ansi','utf-8','utf-16','iso-8859-1','windows-1250']
     
         for fp in files:
-            # 1) try to load columns 0,1 skipping 40 rows under various encodings
-            data = None
-            for enc in encodings:
-                try:
-                    data = np.loadtxt(fp, usecols=(0,1),
-                                      skiprows=40, encoding=enc)
-                    break
-                except Exception:
+            try:
+                shift, intensity, filename = Loading.load_witec(fp)
+            except Exception:
+                continue
+
+            # 2) On the first file, establish the shift‐axis and empty DataFrame
+            if shift_values is None:
+                shift_values = shift.copy()
+                df = pd.DataFrame(
+                    [], 
+                    columns=shift_values.astype(float),
+                    dtype=float
+                )
+            else:
+                # ensure every file has the same shift axis
+                if not np.allclose(shift, shift_values):
+                    print(f'file {fp} has different x axis')
+                    #raise ValueError(f"Shift axis mismatch in file {fp}")
+    
+            # 3) Determine the “key” for this row by mode
+            base = os.path.basename(fp)
+            m   = None
+    
+            if mode.upper() == "SEC":
+                m = re.search(r"([-+]?\d+(?:\.\d+)?)mV", base)
+                if m:
+                    key = float(m.group(1))
+                else:
+                    print(f"⚠️  {base} skipped: no “mV” tag found")
                     continue
-            if data is None:
-                raise ValueError(f"Could not read {fp} with any of {encodings}")
     
-            shift, intensity = data[:,0], data[:,1]
+            else:
+                raise ValueError(f"Unknown mode {mode!r}")
     
+            # 4) Avoid duplicate keys
+            if key in df.index:
+                print(f"⚠️  duplicate key {key} in {base}; skipping")
+                continue
+    
+            # 5) Append the intensity row
+            df.loc[key] = intensity
+    
+        # 6) Finalize
+        df.index.name = mode.lower()
+        # print(df)
+        return df.sort_index()
+    
+    def load_default_1D(directory_path: str, mode: str) -> pd.DataFrame:
+        """
+        Load all .txt spectra in `directory_path`, stacking them into a
+        2D DataFrame whose rows are the scan‐keys (voltage/time/distance)
+        and whose columns are the Raman shifts.
+    
+        Parameters
+        ----------
+        directory_path : str
+            Path to folder containing “*.txt” Horiba files.
+        mode : str
+            One of "SEC", "TIMESCAN", or "LINESCAN" (case‐insensitive).
+    
+        Returns
+        -------
+        df : pd.DataFrame
+            Index = scan keys (float), sorted ascending.
+            Columns = Raman shift values (float), same for every file.
+            Values = intensity (float).
+        """
+    
+        pattern = os.path.join(directory_path, "*.txt")
+        files   = sorted(glob.glob(pattern))
+        if not files:
+            raise ValueError(f"No .txt files in {directory_path!r}")
+    
+        df = None
+        shift_values = None
+    
+        for fp in files:
+            try:
+                shift, intensity, filename = Loading.load_default(fp)
+            except Exception:
+                continue
+
+            # 2) On the first file, establish the shift‐axis and empty DataFrame
+            if shift_values is None:
+                shift_values = shift.copy()
+                df = pd.DataFrame(
+                    [], 
+                    columns=shift_values.astype(float),
+                    dtype=float
+                )
+            else:
+                # ensure every file has the same shift axis
+                if not np.allclose(shift, shift_values):
+                    print(f'file {fp} has different x axis')
+                    #raise ValueError(f"Shift axis mismatch in file {fp}")
+    
+            # 3) Determine the “key” for this row by mode
+            base = os.path.basename(fp)
+            m   = None
+    
+            if mode.upper() == "SEC":
+                m = re.search(r"([-+]?\d+(?:\.\d+)?)mV", base)
+                if m:
+                    key = float(m.group(1))
+                else:
+                    print(f"⚠️  {base} skipped: no “mV” tag found")
+                    continue
+    
+            elif mode.upper() == "TIMEINDEX":
+                m = re.search(r"Time(\d+)", base)
+                if m:
+                    key = float(m.group(1))
+                else:
+                    print(f"⚠️  {base} skipped: no “mV” tag found")
+                    continue
+    
+            else:
+                raise ValueError(f"Unknown mode {mode!r}")
+    
+            # 4) Avoid duplicate keys
+            if key in df.index:
+                print(f"⚠️  duplicate key {key} in {base}; skipping")
+                continue
+    
+            # 5) Append the intensity row
+            df.loc[key] = intensity
+    
+        # 6) Finalize
+        df.index.name = mode.lower()
+        # print(df)
+        return df.sort_index()
+    
+    def load_user_1D(directory_path: str, mode: str) -> pd.DataFrame:
+        """
+        Load all .txt spectra in `directory_path`, stacking them into a
+        2D DataFrame whose rows are the scan‐keys (voltage/time/distance)
+        and whose columns are the Raman shifts.
+    
+        Parameters
+        ----------
+        directory_path : str
+            Path to folder containing “*.txt” Horiba files.
+        mode : str
+            One of "SEC", "TIMESCAN", or "LINESCAN" (case‐insensitive).
+    
+        Returns
+        -------
+        df : pd.DataFrame
+            Index = scan keys (float), sorted ascending.
+            Columns = Raman shift values (float), same for every file.
+            Values = intensity (float).
+        """
+    
+        pattern = os.path.join(directory_path, "*.txt")
+        files   = sorted(glob.glob(pattern))
+        if not files:
+            raise ValueError(f"No .txt files in {directory_path!r}")
+    
+        df = None
+        shift_values = None
+    
+        for fp in files:
+            try:
+                shift, intensity, filename = Loading.load_user(fp)
+            except Exception:
+                continue
+
             # 2) On the first file, establish the shift‐axis and empty DataFrame
             if shift_values is None:
                 shift_values = shift.copy()
@@ -653,15 +828,21 @@ class Processing:
         # print(filename)
         basename = os.path.basename(filename)
         print(basename)
-        match = re.match(r'YA(\d+)_XA(\d+)\.txt', basename)
+        match = re.search(r'YA(\d+)_XA(\d+)', basename)
         if match:
             Y_coordinate, X_coordinate = map(int, match.groups())
             return Y_coordinate, X_coordinate
         else:
-            print(f"Warning: Unable to extract coordinates from {filename}")
-            return None, None
+            # print(f"Warning: Unable to extract coordinates from {filename}")
+            match2 = re.search(r'Y(\d+)_X(\d+)', basename)
+            if match2:
+                Y_coordinate, X_coordinate = map(int, match2.groups())
+                # print(Y_coordinate, X_coordinate)
+                return Y_coordinate, X_coordinate
+            else:
+                print(f"Warning: Also unable to extract coordinates from {filename}...")
+                return None, None
 
-    
     @staticmethod
     def calculate_region_metrics(column_name, intensity_series):
         """
@@ -1106,18 +1287,8 @@ class Plotting:
                 ax_bott_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"], color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)")
             
             ax_bott_left.plot(x_dense, composite, '-', color='red', label='Composite')
-            #1
-            # if y.max() > composite.max():
-            #     y_max = y.max()
-            # else:
-            #     y_max = composite.max()
-            #2    
+ 
             y_max = max(y.max(), composite.max())
-                
-            # if y.min() < composite.min():
-            #     y_min = y.min()
-            # else:
-            #     y_min = composite.min()
             
             y_min = min(y.min(), composite.min())
                 
@@ -1261,7 +1432,8 @@ class Plotting:
         cbar.set_label({
             "TIMESCAN":"Time (s)",
             "LINESCAN":r"Distance (μm)",
-            "SEC":"Potential (mV)"
+            "SEC":"Potential (mV)",
+            "TIMEINDEX":"Index"
         }[mode.upper()])
 
         # 10) decorate axes

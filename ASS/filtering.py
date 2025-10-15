@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Jun  5 21:41:12 2025
-
-@author: marti
+Filtering interface for ASS
+Author: Martin Jindra
 """
 import tkinter as tk
 from tkinter import ttk, messagebox

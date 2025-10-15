@@ -76,7 +76,7 @@ class Map_1D(tk.Toplevel):
         source_menu = ttk.Combobox(
             left_frame,
             textvariable=self.source_var,
-            values=["Witec", "Horiba"],
+            values=["Witec", "Horiba", "Default", "User"],
             state="readonly"
         )
         source_menu.grid(row=1, column=0, sticky="ew", pady=(0,10))
@@ -86,7 +86,7 @@ class Map_1D(tk.Toplevel):
         mode_menu = ttk.Combobox(
             left_frame,
             textvariable=self.mode_var,
-            values=["Linescan", "Timescan", "SEC"],
+            values=["Linescan", "Timescan", "SEC", "Timeindex"],
             state="readonly"
         )
         mode_menu.grid(row=3, column=0, sticky="ew", pady=(0,10))
@@ -221,6 +221,10 @@ class Map_1D(tk.Toplevel):
             self.horiba_load()
         elif src == "Witec":
             self.witec_load()
+        elif src == "Default":
+            self.default_load()
+        elif src == "User":
+            self.default_load()
         else:
             messagebox.showerror("Load Error", f"Unknown source: {src}")
             
@@ -244,19 +248,59 @@ class Map_1D(tk.Toplevel):
             self.directory_path = filedialog.askdirectory(parent = self , title = "Choose directory...")
             if not self.directory_path:
                 return
-            self.df = Loading.load_horiba_1D(self.directory_path, mod)
+            self.df = Loading.load_witec_1D(self.directory_path, mod)
             self.lower_shift_var.set(self.df.columns.min())
             self.upper_shift_var.set(self.df.columns.max())
             self.lower_idx_var.set(self.df.index.min())
             self.upper_idx_var.set(self.df.index.max())
             messagebox.showinfo("Load", "Data were loaded succesfully", parent = self)
         elif mod == 'Linescan':
-            messagebox.showinfo("Load", "Would load Witec Linescan data here.")
+            messagebox.showinfo("Load", "Missing logic for linear scale extraction")
         elif mod == 'Timescan':
-            messagebox.showinfo("Load", "Would load Witec Timescan data here.")
+            messagebox.showinfo("Load", "Missing logic for time scale extraction")
         else:
             messagebox.showinfo("Load Error", f"Unknown mode: {mod}")
-    
+            
+    def default_load(self):
+        mod = self.mode_var.get()
+        if mod == 'SEC' or "Timeindex":
+            # directory_path = File_utils.ask_directory()
+            self.directory_path = filedialog.askdirectory(parent = self , title = "Choose directory...")
+            if not self.directory_path:
+                return
+            self.df = Loading.load_default_1D(self.directory_path, mod)
+            self.lower_shift_var.set(self.df.columns.min())
+            self.upper_shift_var.set(self.df.columns.max())
+            self.lower_idx_var.set(self.df.index.min())
+            self.upper_idx_var.set(self.df.index.max())
+            messagebox.showinfo("Load", "Data were loaded succesfully", parent = self)
+        elif mod == 'Linescan':
+            messagebox.showinfo("Load Error", "Missing logic for linear scale extraction")
+        elif mod == 'Timescan':
+            messagebox.showinfo("Load", "Missing logic for time scale extraction")
+        else:
+            messagebox.showinfo("Load Error", f"Unknown mode: {mod}")
+        
+    def user_load(self):
+        mod = self.mode_var.get()
+        if mod == 'SEC':
+            # directory_path = File_utils.ask_directory()
+            self.directory_path = filedialog.askdirectory(parent = self , title = "Choose directory...")
+            if not self.directory_path:
+                return
+            self.df = Loading.load_user_1D(self.directory_path, mod)
+            self.lower_shift_var.set(self.df.columns.min())
+            self.upper_shift_var.set(self.df.columns.max())
+            self.lower_idx_var.set(self.df.index.min())
+            self.upper_idx_var.set(self.df.index.max())
+            messagebox.showinfo("Load", "Data were loaded succesfully", parent = self)
+        elif mod == 'Linescan':
+            messagebox.showinfo("Load Error", "Missing logic for linear scale extraction")
+        elif mod == 'Timescan':
+            messagebox.showinfo("Load", "Missing logic for time scale extraction")
+        else:
+            messagebox.showinfo("Load Error", f"Unknown mode: {mod}")
+        
     def _on_heatmap(self):
         df = self.df  # your loaded DataFrame
     

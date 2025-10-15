@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 11 15:19:59 2025
-
-@author: Martin Jindra
+ASS strater
+Author: Martin Jindra
 """
 
 from ASS.gui import MainWindow
