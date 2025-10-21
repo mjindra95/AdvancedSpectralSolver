@@ -2,12 +2,8 @@
 """
 Created on Tue Sep 23 12:00:34 2025
 
-@author: marti
-"""
+@author: Martin Jindra 
 
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
 Build a local RAG database from PDFs with Tkinter dialogs.
 - Extracts text with PyMuPDF
 - Chunks text with overlap
@@ -53,7 +49,7 @@ def extract_pdf_text(pdf_path: Path) -> List[Tuple[int, str]]:
     return pages
 
 
-def chunk_by_words(text: str, chunk_size: int = 220, overlap: int = 40, min_words: int = 30) -> List[str]:
+def chunk_by_words(text: str, chunk_size: int = 150, overlap: int = 30, min_words: int = 30) -> List[str]:
     words = text.split()
     if len(words) < min_words:
         return []

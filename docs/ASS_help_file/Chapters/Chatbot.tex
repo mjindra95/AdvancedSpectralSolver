@@ -1,0 +1,30 @@
+\chapter{Chatbot}
+\label{cha:Chatbot}
+
+The application includes an optional Chatbot Assistant (accesible from the About section of the top menu), designed to provide instant, context-aware help directly within the graphical interface. The chatbot can answer questions about the program’s functions, analysis workflows, and terminology, drawing information from the built-in help file and related documentation database. This allows users to quickly obtain guidance without leaving the application — for example, by asking, “How do I reconstruct spectra from PCA results?” or “What does the scaling option mean?”
+
+The chatbot interface offers a simple conversational window where the user can type their question, press Send, and receive a structured and technically accurate reply. This system is especially useful for new users who are still learning the logic of the app or for experienced users who need a quick reminder of function-specific details.
+
+\section{Setup Requirements}
+
+To enable the chatbot feature, a local language model must be installed through the Ollama framework. The application does not include the model by default to keep distribution size small and comply with licensing requirements.
+
+\begin{itemize}
+    \item Install Ollama:
+    \begin{itemize}
+        \item Download and install Ollama from the official website: \href{https://ollama.com/download}{https://ollama.com/download}
+        \item Follow the installation instructions for your operating system.
+    \end{itemize}
+    \item Download a compatible model:
+    \begin{itemize}
+        \item After installation, open a terminal (or command prompt) and pull a suitable model, for example: ollama pull llama3
+        \item You can choose any supported LLM; smaller models (e.g., llama3:8b) offer faster responses, while larger ones provide more detailed answers.
+    \end{itemize}
+    \item Run Ollama locally:
+    \begin{itemize}
+        \item Make sure Ollama is running in the background before launching the application.
+        \item The chatbot will automatically connect to the local Ollama server and use the installed model for dialogue.
+    \end{itemize}
+\end{itemize}
+
+Once configured, the chatbot becomes a fully offline, locally running assistant — no internet connection is required during use, and all processing happens on the user’s computer for maximum privacy and speed.

@@ -1,8 +1,8 @@
 {
-  "created": "2025-09-24T10:31:54.095368Z",
-  "pdf_dir": "C:\\Users\\marti\\Documents\\Data\\RAG_test\\Ass help file",
+  "created": "2025-10-21T09:36:02.709009Z",
+  "pdf_dir": "C:\\Users\\marti\\Documents\\Python Projects\\ASS_2\\AdvancedSpectralSolver\\ASS",
   "num_pdfs": 1,
-  "num_chunks": 33,
+  "num_chunks": 75,
   "vector_dim": 384,
   "model": "sentence-transformers/all-MiniLM-L6-v2",
   "device": "cpu"

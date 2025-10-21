@@ -1317,7 +1317,7 @@ class Plotting:
             ax_left  = fig.add_subplot(111)
             if filtered_data is not None:
                 ax_left.plot(x, y, linestyle = 'dotted', color = 'blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)", alpha = 0.5)
-                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (filtered)")
+                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=config["Raw label"] + " (filtered)" if config["Raw label"] is not None else f"{filename} (filtered)")
             else:
                 ax_left.plot(x, y, color = 'blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
             if compare_data is not None:
