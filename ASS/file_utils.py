@@ -6,6 +6,8 @@ Created on Mon May 12 10:50:11 2025
 """
 
 from tkinter import filedialog
+import os, sys
+
 class File_utils:
     
     def __init__(self, example):
@@ -19,4 +21,14 @@ class File_utils:
     
     def ask_directory(title="Select directory with txt files"):
         return filedialog.askdirectory(title = title)
+
+    @staticmethod    
+    def resource_path(relative_path):
+        """Get absolute path to resource, works for dev and for PyInstaller .exe"""
+        if hasattr(sys, '_MEIPASS'):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+
     

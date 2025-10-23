@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ASS strater
+ASS stater
 Author: Martin Jindra
 """
 

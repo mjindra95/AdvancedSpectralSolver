@@ -306,18 +306,18 @@ class FunctionBlock:
                        "steepnes" : steepnes,
                        "baseline" : baseline}
         elif func_name in ("Lorentzian", "Gaussian"):
-            intensity = np.trapz(residual, x_data)
+            intensity = abs(np.trapz(residual, x_data))
             position_index = np.argmax(residual)
             center = x_data[position_index]
-            fwhm = (x_data[-1]-x_data[0])/4
+            fwhm = abs((x_data[-1]-x_data[0])/4)
             guesses = {"intensity" : intensity,
                        "center" : center,
                        "fwhm" : fwhm}
         elif func_name == "Voigt":
-            intensity = np.trapz(residual, x_data)
+            intensity = abs(np.trapz(residual, x_data))
             position_index = np.argmax(residual)
             center = x_data[position_index]
-            sigma = (x_data[-1]-x_data[0])/8
+            sigma = abs((x_data[-1]-x_data[0])/8)
             gamma = sigma
             guesses = {"intensity" : intensity,
                        "center" : center,
@@ -333,10 +333,10 @@ class FunctionBlock:
                        "fwhm" : fwhm,
                        "q" : q}
         elif func_name in "Asym_Lorentzian":
-            intensity = np.trapz(residual, x_data)
+            intensity = abs(np.trapz(residual, x_data))
             position_index = np.argmax(residual)
             center = x_data[position_index]
-            fwhm = (x_data[-1]-x_data[0])/4
+            fwhm = abs((x_data[-1]-x_data[0])/4)
             y_half = y_data[position_index] - ((y_data[position_index] - residual[position_index]) / 2)
             fL = interp1d(y_data[:position_index+1], x_data[:position_index+1], assume_sorted=False)
             fR = interp1d(y_data[position_index:],   x_data[position_index:],   assume_sorted=False)

@@ -11,17 +11,18 @@ from scipy.optimize import curve_fit
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+# from mpl_toolkits.axes_grid1 import make_axes_locatable
 from .functions import model_dict
 from scipy.signal import savgol_filter, medfilt
 from scipy.integrate import simpson
-import tkinter as tk
-from tkinter import filedialog
+# import tkinter as tk
+# from tkinter import filedialog
 import glob
-import os
 import re
 #from joblib import Parallel, delayed
 import json
+
+from ASS.file_utils import File_utils
 
 class Loading:
     def __init__(self, example):
@@ -181,7 +182,8 @@ class Loading:
             print(f'File {filename} was not load')
         return display_data, filename    
 
-    CONFIG_FILE = os.path.join("ASS", "user_loader.json")
+    # CONFIG_FILE = os.path.join("ASS", "user_loader.json")
+    CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "user_loader.json"))
     
     @staticmethod
     def load_user(file_path):
@@ -1225,7 +1227,8 @@ class Plotting:
     def __init__(self, data):
         self.data = data
 
-    PLOT_CONFIG_FILE = os.path.join("ASS", "plot_config.json")
+    # PLOT_CONFIG_FILE = os.path.join("ASS", "plot_config.json")
+    PLOT_CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "plot_config.json"))
 
     def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state, filtered_compare_data):
         # Load config
@@ -1351,6 +1354,7 @@ class Plotting:
                         lower_index=None,
                         upper_index=None,
                         offset_percent=20,
+                        orientation="ascending",
                         cmap_name="Viridis",
                         correction="None",
                         mode="SEC"):
@@ -1368,6 +1372,8 @@ class Plotting:
             Clip the Y‐axis (row indices) to [lower_index, upper_index], default = full range.
         offset_percent : float
             Vertical offset between spectra = (offset_percent/100) × max_intensity.
+        orientation: str
+            if the plot is made from lower to higher values or vice versa
         cmap_name : str
             Name of a Matplotlib colormap for mapping scan‐key → color.
         correction : {"None","Zero","Linear"}
@@ -1412,6 +1418,11 @@ class Plotting:
 
         # 6) compute offset step
         max_val     = Data_df.values.max()
+        if orientation == "ascending":
+            const = 1
+        else:
+            const = -1
+            
         offset_step = offset_percent/100 * max_val
 
         # 7) prepare for color‐mapping by row‐index
@@ -1421,7 +1432,7 @@ class Plotting:
 
         # 8) plot each spectrum with its offset
         for i, (_, row) in enumerate(Data_df.iterrows()):
-            y = row.to_numpy().astype(float) + i * offset_step
+            y = row.to_numpy().astype(float) + i * offset_step * const
             ax.plot(shifts[col_mask], y, color=cmap(norm_dist[i]))
 
         # 9) add a colorbar showing scan‐key → color

@@ -346,6 +346,7 @@ class Map_1D(tk.Toplevel):
             lower_index=    float(li) if li else None,
             upper_index=    float(ui) if ui else None,
             offset_percent= self.slider_var.get(),
+            orientation=   self.orient_var.get(),
             cmap_name=      self.cmap_var.get(),
             correction=     self.corr_var.get(),
             mode=           self.mode_var.get()

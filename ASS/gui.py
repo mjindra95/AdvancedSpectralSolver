@@ -6,7 +6,7 @@ Author: Martin Jindra
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, Tk, Label
-from PIL import Image, ImageTk
+# tkinter import ttk, filedialog, messagebox
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.widgets import SpanSelector
@@ -14,6 +14,8 @@ import sys, json, csv, os, webbrowser
 import numpy as np
 import pandas as pd
 from collections import OrderedDict
+from PIL import Image, ImageTk
+
 
 from ASS.logic import Loading, Plotting, Processing, Filtering
 from ASS.file_utils import File_utils
@@ -23,7 +25,7 @@ from ASS.filtering import FilterWindow
 from ASS.map_1D import Map_1D
 from ASS.map_2D import Map_2D
 from ASS.excel_plotter import ExcelPlotWindow
-from ASS.chatbot import ChatbotApp
+# from ASS.chatbot import ChatbotApp
 from ASS.user_loader import UserLoaderConfigWindow
 from ASS.plot_config import PlotConfigWindow
 from ASS.pca import open_pca_window
@@ -155,7 +157,7 @@ class MainWindow:
         about_menu.add_command(label="About", command=self.show_about)
         about_menu.add_command(label="Help", command=self.show_help)
         about_menu.add_command(label="Report bug", command=self.report_bug)
-        about_menu.add_command(label="Open chat", command=self.open_chat)
+        # about_menu.add_command(label="Open chat", command=self.open_chat)
         menubar.add_cascade(label="About", menu=about_menu)
 
         self.root.config(menu=menubar)
@@ -173,6 +175,7 @@ class MainWindow:
         image_path = resource_path("ASS/just_logo_nobcg.png")
         img = Image.open(image_path)
         img = img.resize((100, 100), Image.Resampling.LANCZOS)
+        
         self.logo_img = ImageTk.PhotoImage(img)  # store as instance attribute!
         self.logo_label = tk.Label(self.left_panel, image=self.logo_img)
         self.logo_label.pack(pady=(0, 5))
@@ -201,7 +204,8 @@ class MainWindow:
     def _create_plot(self):
         
         # Load config
-        with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
+        # with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(resource_path(Plotting.PLOT_CONFIG_FILE), "r", encoding="utf-8") as f:
             config = json.load(f)
             
         self.fig = Figure(figsize=(6, 4))
@@ -306,7 +310,7 @@ class MainWindow:
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
-                    x_slice = self.dispalay_data["X"].values
+                    x_slice = self.display_data["X"].values
                     y_slice = self.display_data["Y"].values
                     try:
                         y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
@@ -420,7 +424,7 @@ class MainWindow:
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
-                    x_slice = self.dispalay_data["X"].values
+                    x_slice = self.display_data["X"].values
                     y_slice = self.display_data["Y"].values
                     try:
                         y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
@@ -533,7 +537,7 @@ class MainWindow:
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
-                    x_slice = self.dispalay_data["X"].values
+                    x_slice = self.display_data["X"].values
                     y_slice = self.display_data["Y"].values
                     try:
                         y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
@@ -646,7 +650,7 @@ class MainWindow:
                 self.filtered_data = None
                 if getattr(self, "active_filter", None) is not None:
                     func_name, fparams = self.active_filter
-                    x_slice = self.dispalay_data["X"].values
+                    x_slice = self.display_data["X"].values
                     y_slice = self.display_data["Y"].values
                     try:
                         y_filt = getattr(Filtering, func_name)(x_slice, y_slice, **fparams)
@@ -1444,9 +1448,10 @@ class MainWindow:
 
         # 5) Prepare to collect results
         results = []
+            
         x0, x1 = self.batch_xlim
         x0, x1 = float(x0), float(x1)
-
+        
         # 6) Loop over each file
         for idx_file, fn in enumerate(files, start=1):
             label.config(text=f"Fitting {fn} ({idx_file}/{n_files})")
@@ -1578,13 +1583,30 @@ class MainWindow:
     def batch_fit(self):
         print("Batch fit triggered")
         # 1) Preconditions
+        if not hasattr(self, 'display_data') or self.display_data is None:
+            messagebox.showwarning("Batch Fit", "No data loaded to fit.")
+            return
         if not hasattr(self, 'components') or not self.components:
             messagebox.showwarning("Batch Fit", "Define and model first.")
             return
-        if not hasattr(self, 'batch_xlim'):
-            messagebox.showwarning("Batch Fit", "Zoom into the spectral region of interest")
-            # self.batch_xlim = self.display_data['X'].min(), self.display_data['X'].max()
-            return
+        # if not hasattr(self, 'batch_xlim') or self.batch_xlim is None:
+        #     # messagebox.showwarning("Batch Fit", "Zoom into the spectral region of interest")
+        #     x0 = self.display_data['X'].min()
+        #     x1 = self.display_data['X'].max()
+        # else:
+        #     x0, x1 = self.batch_xlim
+        
+        if not hasattr(self, 'batch_xlim') or self.batch_xlim is None:
+            # Fallback to full X range from display_data
+            if hasattr(self, 'display_data') and self.display_data is not None:
+                x0 = self.display_data['X'].min()
+                x1 = self.display_data['X'].max()
+                self.batch_xlim = (x0, x1)  # Save it for consistency
+            else:
+                messagebox.showwarning("Batch Fit", "No zoom range or display data available.")
+                return
+        else:
+            x0, x1 = self.batch_xlim
 
         # 2) Let user pick which loader via a modal Toplevel
         win = tk.Toplevel(self.root)
@@ -1753,16 +1775,13 @@ class MainWindow:
         self.update_composite_plot()
         self.canvas.draw()
         
-    # def spectrum_operation(self):
-    #     messagebox.showinfo("Spectrum oparation", "Mathematical operations with the spectrum will be added")
-        
     def report_bug(self):
         messagebox.showinfo("Report bug", "If you will find some error, you can report it at the Github repository (https://github.com/mjindra95/AdvancedSpectralSolver) or write email to martin.jindra97@gmail.com")
 
-    def open_chat(self):
-        chat_window = tk.Toplevel()
-        ChatbotApp(chat_window)
-        chat_window.grab_set()  # focus on this window
+    # def open_chat(self):
+    #     chat_window = tk.Toplevel()
+    #     ChatbotApp(chat_window)
+    #     chat_window.grab_set()  # focus on this window
         
     def modify_user_loader(self):
         UserLoaderConfigWindow(self.root, Loading.CONFIG_FILE)
@@ -1810,7 +1829,7 @@ class MainWindow:
                 self.compare_data = Processing.substract_linear(self.compare_data)
                 
             if hasattr(self, "filtered_compare_data") and self.filtered_compare_data is not None:
-                self.filtered_compare_data = Processing.substract_linear(self.filtered_compare_dat)
+                self.filtered_compare_data = Processing.substract_linear(self.filtered_compare_data)
     
             # 4) re-plot (update_plot will now show raw vs filtered on the zoomed range)
             self.update_composite_plot()
@@ -1941,7 +1960,7 @@ class MainWindow:
         ttk.Button(win, text="Batch default format", 
                    command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(win, text="Batch user defined format", 
-                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+                   command=lambda: proceed(Loading.load_user_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         
     def batch_sub_linear(self):
         self.disable_compare()
@@ -2005,7 +2024,7 @@ class MainWindow:
         ttk.Button(win, text="Batch default format", 
                    command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(win, text="Batch user defined format", 
-                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+                   command=lambda: proceed(Loading.load_user_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         
     def batch_sub_spectrum(self):
         
@@ -2077,7 +2096,7 @@ class MainWindow:
         ttk.Button(win, text="Batch default format", 
                    command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(win, text="Batch user defined format", 
-                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+                   command=lambda: proceed(Loading.load_user_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         
     def batch_norm(self):
         """Start batch normalization by letting user pick a normalization region."""
@@ -2179,7 +2198,7 @@ class MainWindow:
         ttk.Button(win, text="Batch default format",
                    command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(win, text="Batch user defined format",
-                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+                   command=lambda: proceed(Loading.load_user_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
 
     def batch_filtering(self):
         """Batch process spectra with the currently active filter."""
@@ -2253,7 +2272,7 @@ class MainWindow:
         ttk.Button(win, text="Batch default format",
                    command=lambda: proceed(Loading.load_default_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(win, text="Batch user defined format",
-                   command=lambda: proceed(Loading.load_user_data, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
+                   command=lambda: proceed(Loading.load_user_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
 
     def pca_dialog(self):
         open_pca_window(self.root)
