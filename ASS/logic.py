@@ -183,7 +183,8 @@ class Loading:
         return display_data, filename    
 
     # CONFIG_FILE = os.path.join("ASS", "user_loader.json")
-    CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "user_loader.json"))
+    # CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "user_loader.json"))
+    CONFIG_FILE = File_utils.user_config_path("user_loader.json")
     
     @staticmethod
     def load_user(file_path):
@@ -1228,7 +1229,8 @@ class Plotting:
         self.data = data
 
     # PLOT_CONFIG_FILE = os.path.join("ASS", "plot_config.json")
-    PLOT_CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "plot_config.json"))
+    # PLOT_CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "plot_config.json"))
+    PLOT_CONFIG_FILE = File_utils.user_config_path("plot_config.json")
 
     def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state, filtered_compare_data):
         # Load config

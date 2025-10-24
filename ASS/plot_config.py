@@ -50,7 +50,10 @@ class PlotConfigWindow(tk.Toplevel):
             value = entry.get().strip()
 
             if value == "":
-                self.config[key] = None
+                if key == "Compare offset":
+                    self.config[key] = 0
+                else:
+                    self.config[key] = None
             else:
                 # Try to parse JSON-like input (lists, dicts, numbers)
                 try:

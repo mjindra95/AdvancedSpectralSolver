@@ -205,7 +205,10 @@ class MainWindow:
         
         # Load config
         # with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
-        with open(resource_path(Plotting.PLOT_CONFIG_FILE), "r", encoding="utf-8") as f:
+        # with open(resource_path(Plotting.PLOT_CONFIG_FILE), "r", encoding="utf-8") as f:
+        #     config = json.load(f)
+        
+        with open(File_utils.user_config_path("plot_config.json"), "r", encoding="utf-8") as f:
             config = json.load(f)
             
         self.fig = Figure(figsize=(6, 4))

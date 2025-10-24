@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import time
 
-from ASS.file_utils import File_utils
+# from ASS.file_utils import File_utils
 from ASS.logic import Loading, Plotting, Processing
 
 class Map_1D(tk.Toplevel):
