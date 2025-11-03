@@ -9,11 +9,13 @@ import glob
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import numpy as np
+import pandas as pd
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.widgets import RectangleSelector
 
 from ASS.logic import Loading, Processing, Plotting
+from ASS.file_utils import File_utils
 
 class Map_2D(tk.Toplevel):
     def __init__(self, main_win, plot_callback):
@@ -201,6 +203,12 @@ class Map_2D(tk.Toplevel):
         self.save_fit_btn.grid(row=row+1, column=0, sticky="ew", pady=(0,15))
         row = row+1
         
+        self.load_fit_btn = ttk.Button(right, text="Load fit",
+                                       command=self._on_load_fit)
+        
+        self.load_fit_btn.grid(row=row+1, column=0, sticky="ew", pady=(0,15))
+        row = row+1
+        
         # # Save button
         # ttk.Button(right, text="Save picture", command=self.save_plot)\
         #    .grid(row=row+1, column=0, sticky="ew", pady=(0,15))
@@ -380,6 +388,11 @@ class Map_2D(tk.Toplevel):
         menu.grab_release()
         
     def _plot_last_pixel(self):
+        
+        if getattr(self, "df2d", None) is None:
+            messagebox.showwarning("No map", "Load a map first", parent=self)
+            return
+        
         xpix, ypix = self._last_pixel
         
         ls = self.lower_shift.get().strip()
@@ -582,11 +595,13 @@ class Map_2D(tk.Toplevel):
         # 3) plot
         vmin = float(self.scale_min.get()) if self.scale_min.get().strip() else None
         vmax = float(self.scale_max.get()) if self.scale_max.get().strip() else None
+        
+        meta = getattr(self, "map_meta", None)
 
         new_ax = Plotting.plot_2d(
             ax=         self.ax,
             df=    self.fit_df,
-            meta_data = self.map_meta,
+            meta_data = meta,
             source =    metric,
             cmap_name = cmap,
             interp =    interp,
@@ -622,3 +637,24 @@ class Map_2D(tk.Toplevel):
             messagebox.showinfo("Saved", f"Fit results saved to:\n{path}", parent=self)
         except Exception as e:
             messagebox.showerror("Error", f"Could not save fit results:\n{e}", parent=self)
+
+    def _on_load_fit(self):
+        file_path = File_utils.ask_excel_file()
+        
+        if not file_path:
+            return  # user cancelled
+        
+        self.fit_df = pd.read_excel(file_path)
+        
+        # now enable & populate the controls:
+        params = [c for c in self.fit_df.columns if c not in ("X","Y")]
+        
+        if not params:
+            messagebox.showwarning("Warning", "No parameters found in file.")
+            return
+        
+        self.param_menu.config(values=params, state="readonly")
+        self.param_var.set(params[0])
+        self.plot_fit_btn.config(state="normal")        
+        self.save_fit_btn.config(state="normal") 
+        

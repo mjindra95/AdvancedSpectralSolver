@@ -21,6 +21,13 @@ class File_utils:
         )
     
     @staticmethod
+    def ask_excel_file(title="Select excel file"):
+        return filedialog.askopenfilename(
+            title=title,
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+    
+    @staticmethod
     def ask_directory(title="Select directory with txt files"):
         return filedialog.askdirectory(title=title)
 

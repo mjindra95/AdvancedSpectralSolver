@@ -67,6 +67,19 @@ class ExcelPlotWindow:
         self.cmap_combo.set("viridis")
         self.cmap_combo.pack(fill=tk.X, pady=(0, 10))
 
+        ttk.Label(self.left_panel, text="Plot title:").pack(anchor='w')
+        self.title = ttk.Entry(self.left_panel, state='disabled')
+        self.title.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(self.left_panel, text="Plot style:").pack(anchor='w')
+        self.plot_style_combo = ttk.Combobox(
+            self.left_panel,
+            values=["Scatter", "Line", "Line + Markers"],
+            state='disabled'
+        )
+        # default
+        self.plot_style_combo.set("Scatter")
+        self.plot_style_combo.pack(fill=tk.X, pady=(0, 10))
     
         # Plot button
         self.plot_button = ttk.Button(self.left_panel, text="Plot", state='disabled', command=self._plot_data)
@@ -104,76 +117,17 @@ class ExcelPlotWindow:
         self.x_axis_label.config(state='normal')
         self.y_axis_label.config(state='normal')
         self.c_axis_label.config(state='normal')
+        self.title.config(state='normal')
+        self.plot_style_combo.config(state='readonly')
         self.plot_button.config(state='normal')
         self.save_button.config(state='normal')
-
-    # def _plot_data(self):
-    #     x_col = self.x_combo.get()
-    #     y_col = self.y_combo.get()
-    #     if not x_col or not y_col:
-    #         messagebox.showwarning("Missing Selection", "Please select both X and Y columns.")
-    #         return
-
-    #     try:
-    #         x = self.df[x_col]
-    #         y = self.df[y_col]
-    #     except Exception as e:
-    #         messagebox.showerror("Plot Error", f"Could not extract data:\n{e}")
-    #         return
-
-    #     self.ax.clear()
-    #     self.ax.scatter(x, y)
-
-    #     # Axis labels
-    #     x_label = self.x_axis_label.get().strip()
-    #     y_label = self.y_axis_label.get().strip()
-    #     self.ax.set_xlabel(x_label if x_label else x_col)
-    #     self.ax.set_ylabel(y_label if y_label else y_col)
-
-    #     # self.ax.set_title("Scatter Plot")
-    #     self.canvas.draw()
-    
-    # def _plot_data(self):
-    #     x_col = self.x_combo.get()
-    #     y_col = self.y_combo.get()
-    #     c_col = self.c_combo.get()  # optional third variable
-    #     cmap = self.cmap_combo.get()
-    
-    #     if not x_col or not y_col:
-    #         messagebox.showwarning("Missing Selection", "Please select both X and Y columns.")
-    #         return
-    
-    #     try:
-    #         x = self.df[x_col]
-    #         y = self.df[y_col]
-    #         c = self.df[c_col] if c_col else None
-    #     except Exception as e:
-    #         messagebox.showerror("Plot Error", f"Could not extract data:\n{e}")
-    #         return
-    
-    #     self.ax.clear()
-    
-    #     # If color variable is chosen → color gradient + colorbar
-    #     if c_col and c is not None:
-    #         sc = self.ax.scatter(x, y, c=c, cmap=cmap)
-    #         cbar = self.fig.colorbar(sc, ax=self.ax)
-    #         cbar.set_label(c_col)
-    #     else:
-    #         self.ax.scatter(x, y, color='C0')  # default blue if no color variable
-    
-    #     # Axis labels
-    #     x_label = self.x_axis_label.get().strip()
-    #     y_label = self.y_axis_label.get().strip()
-    #     self.ax.set_xlabel(x_label if x_label else x_col)
-    #     self.ax.set_ylabel(y_label if y_label else y_col)
-    
-    #     self.canvas.draw()
     
     def _plot_data(self):
         x_col = self.x_combo.get()
         y_col = self.y_combo.get()
         c_col = self.c_combo.get()
         cmap = self.cmap_combo.get()
+        style = self.plot_style_combo.get()
     
         if not x_col or not y_col:
             messagebox.showwarning("Missing Selection", "Please select both X and Y columns.")
@@ -190,29 +144,76 @@ class ExcelPlotWindow:
         # --- Destroy and recreate the figure + canvas ---
         for widget in self.right_panel.winfo_children():
             widget.destroy()
+            
+        # Close the previous figure if it exists
+        try:
+            plt.close(self.fig)
+        except AttributeError:
+            pass
     
         self.fig, self.ax = plt.subplots(figsize=(6, 5))
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.right_panel)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
     
         # --- Plotting logic ---
+        # if c_col and c is not None:
+        #     sc = self.ax.scatter(x, y, c=c, cmap=cmap)
+        #     cbar = self.fig.colorbar(sc, ax=self.ax)
+        #     c_label = self.c_axis_label.get().strip()
+        #     cbar.set_label(c_label if c_label else c_col)
+        # else:
+        #     self.ax.scatter(x, y, color='C0')
+        
         if c_col and c is not None:
-            sc = self.ax.scatter(x, y, c=c, cmap=cmap)
-            cbar = self.fig.colorbar(sc, ax=self.ax)
-            c_label = self.c_axis_label.get().strip()
-            cbar.set_label(c_label if c_label else c_col)
+            # We will always use scatter + colorbar here
+            if style == "Scatter":
+                sc = self.ax.scatter(x, y, c=c, cmap=cmap)
+                cbar = self.fig.colorbar(sc, ax=self.ax)
+                c_label = self.c_axis_label.get().strip()
+                cbar.set_label(c_label if c_label else c_col)
+            elif style == "Line":
+                self.ax.plot(x, y, linestyle='-', marker=None, color='C0')
+            elif style == "Line + Markers":
+                self.ax.plot(x, y, linestyle='-', marker=None, color='grey')
+                sc = self.ax.scatter(x, y, c=c, cmap=cmap)
+                cbar = self.fig.colorbar(sc, ax=self.ax)
+                c_label = self.c_axis_label.get().strip()
+                cbar.set_label(c_label if c_label else c_col)
+        
+            # Gentle heads-up if user asked for line-based style
+            # if style in ["Line", "Line + Markers"]:
+            #     messagebox.showinfo(
+            #         "Plot Style Notice",
+            #         "Color-mapped data is shown as a scatter plot. "
+            #         "Line styles with per-point colormap are not supported."
+            #     )
+        
         else:
-            self.ax.scatter(x, y, color='C0')
-    
+            # No color variable -> honor requested style
+            if style == "Scatter":
+                self.ax.scatter(x, y, color='C0')
+        
+            elif style == "Line":
+                # line only
+                self.ax.plot(x, y, linestyle='-', marker=None, color='C0')
+        
+            elif style == "Line + Markers":
+                # line + markers
+                self.ax.plot(x, y, linestyle='-', marker='o', color='C0')
+        
+            else:
+                # Fallback safety (shouldn't happen because combo is restricted)
+                self.ax.scatter(x, y, color='C0')
+            
         # Axis labels
         x_label = self.x_axis_label.get().strip()
         y_label = self.y_axis_label.get().strip()
+        title = self.title.get().strip()
         self.ax.set_xlabel(x_label if x_label else x_col)
         self.ax.set_ylabel(y_label if y_label else y_col)
+        self.ax.set_title(title if title else None)
     
         self.canvas.draw()
-
-
 
     def _save_plot(self):
         path = filedialog.asksaveasfilename(
@@ -225,7 +226,3 @@ class ExcelPlotWindow:
                 messagebox.showinfo("Saved", f"Plot saved to:\n{path}")
             except Exception as e:
                 messagebox.showerror("Save Error", f"Could not save image:\n{e}")
-                
-    def test():
-        pass
-    

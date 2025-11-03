@@ -1270,11 +1270,28 @@ class Plotting:
                 func   = model_dict[name]['func']
                 pnames = model_dict[name]['params']
                 pvals  = [comp['params'].get(pn, 0.0) for pn in pnames]
+                
                 y_comp = func(x_dense, *pvals)
 
                 if not np.allclose(y_comp, 0.0):
                     if name in ('Linear','Sigmoid'):
                         ax_bott_left.plot(x_dense, y_comp, '--', c='gray', label=label, alpha=0.8)
+                    elif name == "Double Lorentz":
+                        counter += 1
+                        intensity1, center1, intensity2, center2, fwhm = pvals
+                        width = fwhm / 2
+                        
+                        y1 = intensity1 / (np.pi * width * (1 + ((x_dense - center1) / width)**2))
+                        y2 = intensity2 / (np.pi * width * (1 + ((x_dense - center2) / width)**2))
+                        
+                        if name == func:
+                            ax_bott_right.plot(x_dense, y_comp, '--', label=f'{name} #{counter}', alpha=0.8)
+                            ax_bott_right.plot(x_dense, y1, '--', label=f'{name} #{counter} (first)', alpha=0.5)
+                            ax_bott_right.plot(x_dense, y2, '--', label=f'{name} #{counter} (second)', alpha=0.5)
+                        else:
+                            ax_bott_right.plot(x_dense, y_comp, '--', label=label, alpha=0.8)
+                            ax_bott_right.plot(x_dense, y1, '--', label=f'{label} (first)', alpha=0.5)
+                            ax_bott_right.plot(x_dense, y2, '--', label=f'{label} (second)', alpha=0.5)
                     else:
                         counter = counter + 1
                         if name == func:

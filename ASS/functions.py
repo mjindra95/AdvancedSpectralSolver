@@ -80,24 +80,66 @@ def asym_lorentzian(x, intensity, center, fwhm, alpha):
     width = np.maximum(width, 1e-10)  # Prevent division by zero
     return intensity / (np.pi * width * (1 + ((x - center) / width) ** 2))
 
+# def fano(x, intensity, center, fwhm, q):
+#     """
+#     Fano resonance profile.
+
+#     Parameters:
+#     x : array-like
+#         Independent variable.
+#     intensity : float
+#         Area under the curve (real intensity).
+#     center : float
+#         Resonance peak position.
+#     fwhm : float
+#         Full Width at Half Maximum (controls resonance width).
+#     q : float
+#         Fano asymmetry parameter (q=0 gives symmetric dip).
+#     """
+#     epsilon = (x - center) / (fwhm / 2)
+#     return intensity * ((q + epsilon) ** 2) / (1 + epsilon ** 2)
+
 def fano(x, intensity, center, fwhm, q):
     """
-    Fano resonance profile.
+    Breit–Wigner–Fano (BWF) resonance profile.
+
+    Parameters
+    ----------
+    x : array-like
+        Independent variable (e.g., frequency or Raman shift).
+    amplitude/intenisty : float
+        Peak amplitude scaling factor.
+    center : float
+        Resonance position (ω₀).
+    fwhm : float
+        Full width at half maximum (Γ).
+    q : float
+        Fano asymmetry parameter (q → ∞ → Lorentzian).
+    """
+    epsilon = 2 * (x - center) / fwhm
+    return intensity * ((q + epsilon)**2 / (1 + epsilon**2))
+
+
+def double_lorentzian(x, intensity1, center1, intensity2, center2, fwhm):
+    """
+    Double-Lorentzian peak function.
 
     Parameters:
     x : array-like
-        Independent variable.
-    intensity : float
-        Area under the curve (real intensity).
-    center : float
-        Resonance peak position.
+        Independent variable (e.g., wavenumber, frequency).
+    int1 : float
+        Area of the fist orsilator.
+    cen1 : float
+        Position of the fist orsilator. (center of the Lorentzian).
+    int2 : float
+        Area of the second orsilator.
+    cen2 : float
+        Position of the second orsilator. (center of the Lorentzian).
     fwhm : float
-        Full Width at Half Maximum (controls resonance width).
-    q : float
-        Fano asymmetry parameter (q=0 gives symmetric dip).
+        Shared Full Width at Half Maximum, controlling the peak's width.
     """
-    epsilon = (x - center) / (fwhm / 2)
-    return intensity * ((q + epsilon) ** 2) / (1 + epsilon ** 2)
+    width = fwhm/2
+    return intensity1/(np.pi * width * (1+((x-center1)/width)**2)) + intensity2/(np.pi * width * (1+((x-center2)/width)**2))
 
 def linear(x, slope, intercept):
     """
@@ -152,6 +194,10 @@ model_dict = {
     "Fano": {
         "func": fano,
         "params": ["intensity", "center", "fwhm", "q"],
+    },
+    "Double Lorentz": {
+        "func": double_lorentzian,
+        "params": ["intensity #1", "center #1", "intensity #2", "center #2", "fwhm"],
     },
     "Linear": {
         "func": linear,

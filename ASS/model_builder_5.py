@@ -293,6 +293,7 @@ class FunctionBlock:
             intercept = y_data[0] - slope*x_data[0]
             guesses = {"slope": slope, 
                        "intercept": intercept}
+            
         elif func_name == "Sigmoid":
             if y_data[0] > y_data[-1]:
                 amplitude = y_data[0]-y_data[-1]
@@ -305,6 +306,7 @@ class FunctionBlock:
                        "center" : center,
                        "steepnes" : steepnes,
                        "baseline" : baseline}
+            
         elif func_name in ("Lorentzian", "Gaussian"):
             intensity = abs(np.trapz(residual, x_data))
             position_index = np.argmax(residual)
@@ -313,6 +315,7 @@ class FunctionBlock:
             guesses = {"intensity" : intensity,
                        "center" : center,
                        "fwhm" : fwhm}
+            
         elif func_name == "Voigt":
             intensity = abs(np.trapz(residual, x_data))
             position_index = np.argmax(residual)
@@ -323,15 +326,18 @@ class FunctionBlock:
                        "center" : center,
                        "gamma" : gamma,
                        "sigma" : sigma}
+            
         elif func_name in "Fano":
-            intensity = np.trapz(residual, x_data)
+            # intensity = np.trapz(residual, x_data)
             center = x_data[-1]-(x_data[-1]-x_data[0])/2
             fwhm = (x_data[-1]-x_data[0])/4
-            q = 0
+            q = 2
+            intensity = max(residual)/(q**2)
             guesses = {"intensity" : intensity,
                        "center" : center,
                        "fwhm" : fwhm,
                        "q" : q}
+            
         elif func_name in "Asym_Lorentzian":
             intensity = abs(np.trapz(residual, x_data))
             position_index = np.argmax(residual)
@@ -349,6 +355,30 @@ class FunctionBlock:
                        "center" : center,
                        "fwhm" : fwhm,
                        "alpha" : alpha}
+            
+        elif func_name in "Double Lorentz":
+            selected_range = len(x_data)
+            mid = selected_range // 2
+            
+            first_half = x_data[:mid]
+            first_half_data = residual[:mid]
+            
+            second_half = x_data[mid:]
+            second_half_data = residual[mid:]
+            
+            area_first = np.trapz(first_half_data, first_half)
+            area_second = np.trapz(second_half_data, second_half)
+            
+            center_fisrt = x_data[0]+(x_data[-1]-x_data[0])/4
+            center_second = x_data[-1]-(x_data[-1]-x_data[0])/4
+            
+            fwhm = (x_data[-1]-x_data[0])/4
+            
+            guesses = {"intensity #1" : area_first,
+                       "center #1" : center_fisrt,
+                       "intensity #2" : area_second,
+                       "center #2" : center_second,
+                       "fwhm" : fwhm}
         else:
             messagebox.showinfo("This is not defined function")
         
@@ -373,7 +403,7 @@ class FunctionBlock:
                     lower_str = guesses[pname]*0.99
                     upper_str = guesses[pname]*1.01
             else:
-                if pname == "intensity":
+                if pname == "intensity" or pname == "intensity #1" or pname == "intensity #2":
                     # intensity ≥ 0
                     lower_str = "0"
                     # leave upper blank (None)
@@ -382,7 +412,7 @@ class FunctionBlock:
                     # fwhm ≥ 0
                     lower_str = "0"
                     upper_str = ""
-                elif pname == "center":
+                elif pname == "center" or pname == "center #1" or pname == "center #2":
                     # center ∈ [xmin, xmax]
                     lower_str = f"{xmin:.4g}"
                     upper_str = f"{xmax:.4g}"
