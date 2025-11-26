@@ -6,7 +6,6 @@ Author: Martin Jindra
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, Tk, Label
-# tkinter import ttk, filedialog, messagebox
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.widgets import SpanSelector
@@ -15,11 +14,13 @@ import numpy as np
 import pandas as pd
 from collections import OrderedDict
 from PIL import Image, ImageTk
+import io
+import win32clipboard
 
 
 from ASS.logic import Loading, Plotting, Processing, Filtering
 from ASS.file_utils import File_utils
-from ASS.model_builder_5 import ModelBuilderWindow
+from ASS.model_builder_6 import ModelBuilderWindow
 from ASS.functions import model_dict
 from ASS.filtering import FilterWindow
 from ASS.map_1D import Map_1D
@@ -30,16 +31,28 @@ from ASS.user_loader import UserLoaderConfigWindow
 from ASS.plot_config import PlotConfigWindow
 from ASS.pca import open_pca_window
 
+# def resource_path(relative_path):
+#     """ Get absolute path to resource, works for dev and for PyInstaller """
+#     if hasattr(sys, '_MEIPASS'):
+#         return os.path.join(sys._MEIPASS, relative_path)
+#     return os.path.join(os.path.abspath("."), relative_path)
+
 def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    if hasattr(sys, '_MEIPASS'):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.dirname(os.path.abspath(__file__))  # use script folder
+    return os.path.join(base_path, relative_path)
 
 class MainWindow:
-    def __init__(self):
+    def __init__(self, licence_payload=None):
         self.root = tk.Tk()
         self.root.title("Advanced Spectral Solver")
+        
+        # store licence info
+        self.licence_payload = licence_payload or {}
+        self.is_pro = self.licence_payload.get("licence_type", "Free") == "Pro"
 
         self.root.state("zoomed")
         self.root.resizable(True, True)
@@ -172,7 +185,8 @@ class MainWindow:
         self.plot_panel = tk.Frame(self.main_frame)
         self.plot_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        image_path = resource_path("ASS/just_logo_nobcg.png")
+        # image_path = resource_path("ASS/just_logo_nobcg.png")
+        image_path = resource_path("just_logo_nobcg.png")
         img = Image.open(image_path)
         img = img.resize((100, 100), Image.Resampling.LANCZOS)
         
@@ -203,19 +217,14 @@ class MainWindow:
 
     def _create_plot(self):
         
-        # Load config
-        # with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
-        # with open(resource_path(Plotting.PLOT_CONFIG_FILE), "r", encoding="utf-8") as f:
-        #     config = json.load(f)
-        
         with open(File_utils.user_config_path("plot_config.json"), "r", encoding="utf-8") as f:
             config = json.load(f)
             
         self.fig = Figure(figsize=(6, 4))
         self.ax = self.fig.add_subplot(111)
         self.ax.set_title("Spectrum")
-        self.ax.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
-        self.ax.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
+        self.ax.set_xlabel(config["X axis label"] if config["X axis label"] is not None else "Raman shift (cm$^{-1}$)")
+        self.ax.set_ylabel(config["Y axis label"] if config["Y axis label"] is not None else "Intensity (arb. u.)")
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_panel)
         # self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -241,6 +250,7 @@ class MainWindow:
     def _on_canvas_right_click(self, event):
         menu = tk.Menu(self.root, tearoff=0)
         menu.add_command(label = "Update plot", command = self.update_composite_plot)
+        menu.add_command(label = "Copy to clipboard", command = lambda: Plotting.copy_figure_to_clipboard(self.fig))
         menu.add_command(label = "Plot config file", command = self.spectrum_config)
         menu.add_separator()
         menu.add_command(label="Save Plot",   command=self.save_plot)
@@ -262,6 +272,7 @@ class MainWindow:
         self.root.bind("<Control-r>", lambda event: self.save_report())
         self.root.bind("<Control-e>", lambda event: self.save_both())
         self.root.bind("<Control-b>", lambda event: self.open_model_builder())
+        self.root.bind("<Control-c>", lambda event: Plotting.copy_figure_to_clipboard(self.fig))
 
     def load_horiba_data(self):
         print("Load Horiba data triggered")
@@ -1552,14 +1563,15 @@ class MainWindow:
             self.fig.savefig(img_path, dpi=150)
 
             # 6i) Record a single row of results (values + errors)
-            row = {"file": basename, "zoom_min": x0, "zoom_max": x1}
+            # row = {"file": basename, "zoom_min": x0, "zoom_max": x1}
+            row = {"file": basename}
             flat_idx = 0
             for comp in self.components:
                 lbl    = comp.get("label", comp["model_name"])
                 pname_list = model_dict[comp["model_name"]]["params"]
                 for pname in pname_list:
                     row[f"{lbl}_{pname}"]      = popt[flat_idx]
-                    row[f"{lbl}_{pname}_err"]  = perr[flat_idx]
+                    # row[f"{lbl}_{pname}_err"]  = perr[flat_idx] # if the error value is needed uncomment this line...
                     flat_idx += 1
             results.append(row)
 
@@ -1585,6 +1597,10 @@ class MainWindow:
     
     def batch_fit(self):
         print("Batch fit triggered")
+        
+        if not self.is_pro:
+            messagebox.showinfo("Pro Feature", "This feature is available only in the Pro version.")
+            return
         # 1) Preconditions
         if not hasattr(self, 'display_data') or self.display_data is None:
             messagebox.showwarning("Batch Fit", "No data loaded to fit.")
@@ -1694,6 +1710,11 @@ class MainWindow:
         self.update_composite_plot()
 
     def map_2D(self):
+        
+        if not self.is_pro:
+            messagebox.showinfo("Pro Feature", "This feature is available only in the Pro version.")
+            return
+        
         Map_2D(self, plot_callback=self.plot_pixel_spectrum)
     
     def plot_pixel_spectrum(self, x, y, label=None):
@@ -1727,6 +1748,11 @@ class MainWindow:
         self.canvas.draw()
     
     def map_1D(self):
+        
+        if not self.is_pro:
+            messagebox.showinfo("Pro Feature", "This feature is available only in the Pro version.")
+            return
+        
         Map_1D(self, plot_callback=self.plot_index_spectrum)
         
     def plot_index_spectrum(self, data):
@@ -1758,6 +1784,11 @@ class MainWindow:
         self.canvas.draw()
         
     def excel_plot(self):
+        
+        if not self.is_pro:
+            messagebox.showinfo("Pro Feature", "This feature is available only in the Pro version.")
+            return
+        
         ExcelPlotWindow(self.root)
         
     def compare_spectrum(self):
@@ -2278,7 +2309,54 @@ class MainWindow:
                    command=lambda: proceed(Loading.load_user_folder, self.batch_xlim)).pack(fill=tk.X, padx=10, pady=5)
 
     def pca_dialog(self):
+        
+        if not self.is_pro:
+            messagebox.showinfo("Pro Feature", "This feature is available only in the Pro version.")
+            return
+        
         open_pca_window(self.root)
+
+    def copy_figure_to_clipboard(self):
+        """
+        Copy a Matplotlib figure to the Windows clipboard as an image (CF_DIB format).
+    
+        Parameters
+        ----------
+        fig : matplotlib.figure.Figure
+            The Matplotlib figure to copy.
+        """
+        if self.fig is None:
+            print("⚠️ No figure available to copy.")
+            messagebox.showinfo("Clipboard", "⚠️ No figure available to copy.")
+            return
+        
+        try:
+            # --- Save the figure to an in-memory PNG buffer ---
+            buf = io.BytesIO()
+            self.fig.savefig(buf, format="png", dpi=300, bbox_inches="tight", facecolor="white")
+            buf.seek(0)
+    
+            # --- Load with Pillow ---
+            img = Image.open(buf)
+    
+            # --- Convert to DIB (Device Independent Bitmap) format ---
+            output = io.BytesIO()
+            img.convert("RGB").save(output, "BMP")
+            data = output.getvalue()[14:]  # remove BMP header
+            output.close()
+    
+            # --- Send to Windows clipboard ---
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+            win32clipboard.CloseClipboard()
+    
+            print("✅ Figure copied to clipboard as image.")
+            # messagebox.showinfo("Clipboard", "✅ Figure copied to clipboard as image.")
+        except Exception as e:
+            print(f"⚠️ Failed to copy figure to clipboard: {e}")
+            messagebox.showinfo("Clipboard", f"⚠️ Failed to copy figure to clipboard: {e}")
+
     
     def show_message(self):
         

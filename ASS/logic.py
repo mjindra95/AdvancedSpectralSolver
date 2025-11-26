@@ -7,19 +7,14 @@ import os
 import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
-# from matplotlib.axes import Axes
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-# from mpl_toolkits.axes_grid1 import make_axes_locatable
 from .functions import model_dict
 from scipy.signal import savgol_filter, medfilt
 from scipy.integrate import simpson
-# import tkinter as tk
-# from tkinter import filedialog
 import glob
 import re
-#from joblib import Parallel, delayed
 import json
 
 from ASS.file_utils import File_utils
@@ -510,14 +505,19 @@ class Loading:
     
             elif mode.upper() == "LINESCAN":
                 key = None
-                with open(fp, encoding=enc) as f:
-                    for line in f:
-                        if line.startswith("#Distance"):
-                            try:
-                                key = float(line.split("=",1)[1])
-                            except:
-                                pass
-                            break
+                for enc in encodings:
+                    try:
+                        with open(fp, encoding=enc) as f:
+                            for line in f:
+                                if line.startswith("#Distance"):
+                                    try:
+                                        key = float(line.split("=",1)[1])
+                                    except:
+                                        pass
+                                    break
+                        break # if succeded
+                    except UnicodeDecodeError:
+                        continue
                 if key is None:
                     print(f"⚠️  {base} skipped: no #Distance=… in header")
                     continue
@@ -1231,12 +1231,24 @@ class Plotting:
     # PLOT_CONFIG_FILE = os.path.join("ASS", "plot_config.json")
     # PLOT_CONFIG_FILE = File_utils.resource_path(os.path.join("ASS", "plot_config.json"))
     PLOT_CONFIG_FILE = File_utils.user_config_path("plot_config.json")
+    
+    def get_bool(config, key, default=False):
+        val = config.get(key, default)
+        if isinstance(val, str):
+            val = val.strip().lower() in ("true", "1", "yes", "on", "visible")
+        return bool(val)
 
     def update_plot(fig, data, filename, components, filtered_data, compare_data, compare_filename, model_state, filtered_compare_data):
         # Load config
         with open(Plotting.PLOT_CONFIG_FILE, "r", encoding="utf-8") as f:
             config = json.load(f)
-            
+        
+        show_residual = Plotting.get_bool(config, "Residual plot visibility", True)    
+        
+        # show_residual = config.get("Residual plot visibility", True)
+        # print("Show residual:", show_residual)
+        # print("Type:", type(show_residual))
+        
         fig.clear()
 
         x = data['X'].values
@@ -1261,9 +1273,21 @@ class Plotting:
 
         if not np.allclose(composite, 0.0) and model_state is True:
             # — full plot: individual components + composite & residual spectrum
-            gs = GridSpec(nrows=2, ncols=1, height_ratios=[2, 8], hspace=0.05, figure=fig)
-            ax_bott_left  = fig.add_subplot(gs[1,0])
-            ax_bott_right = ax_bott_left.twinx()
+            # gs = GridSpec(nrows=2, ncols=1, height_ratios=[2, 8], hspace=0.05, figure=fig)
+            # ax_bott_left  = fig.add_subplot(gs[1,0])
+            # ax_bott_right = ax_bott_left.twinx()
+            
+            if show_residual:
+                # --- two panels (top: residual, bottom: main) ---
+                gs = GridSpec(nrows=2, ncols=1, height_ratios=[1, 4], hspace=0.05, figure=fig)
+                ax_bott_left  = fig.add_subplot(gs[1, 0])
+                ax_bott_right = ax_bott_left.twinx()
+            else:
+                # --- single panel (main only) ---
+                gs = GridSpec(nrows=1, ncols=1, figure=fig)
+                ax_bott_left  = fig.add_subplot(gs[0, 0])
+                ax_bott_right = ax_bott_left.twinx()              # still define it for consistency
+            
             for comp in components:
                 name   = comp['model_name']
                 label  = comp.get("label", comp["model_name"])
@@ -1298,17 +1322,26 @@ class Plotting:
                             ax_bott_right.plot(x_dense, y_comp, '--', label=f'{name}{counter}', alpha=0.8)
                         else:
                             ax_bott_right.plot(x_dense, y_comp, '--', label=label, alpha=0.8)
-            ax_bott_right.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
+            ax_bott_right.set_ylabel(config["Y axislabel"] if config["Y axis label"] is not None else "Intensity (arb. u.)")
             if filtered_data is not None:
-                ax_bott_left.plot(x, y, linestyle = 'dotted', color='black', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
-                ax_bott_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (filtered)")
+                ax_bott_left.plot(x, y, linestyle = 'dotted', color='black', label=config["Raw spectrum label"] if config["Raw spectrum label"] is not None else f"{filename} (raw)")
+                ax_bott_left.plot(filtered_data["X"].values, filtered_data["Y"].values, 
+                                  color=config["Raw spectrum color"] if config["Raw spectrum color"] is not None else "blue", 
+                                  label=config["Raw spectrum label"] if config["Raw spectrum label"] is not None else f"{filename} (filtered)")
             else:
-                ax_bott_left.scatter(x, y, s=5, color='blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
+                ax_bott_left.scatter(x, y, s=5, 
+                                     color=config["Raw spectrum color"] if config["Raw spectrum color"] is not None else "blue", 
+                                     label=config["Raw spectrum label"] if config["Raw spectrum label"] is not None else f"{filename} (raw)")
                 
             if compare_data is not None:
-                ax_bott_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"], color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)")
+                offset = config["Compare spectrum offset"] if config["Compare spectrum offset"] is not None else 0
+                ax_bott_left.plot(compare_data["X"].values, compare_data["Y"].values + offset, 
+                                  color=config["Compare spectrum color"] if config["Compare spectrum color"] is not None else "green", 
+                                  label=config["Compare spectrum label"] if config["Compare spectrum label"] is not None else f"{compare_filename} (raw)")
             
-            ax_bott_left.plot(x_dense, composite, '-', color='red', label='Composite')
+            ax_bott_left.plot(x_dense, composite, '-', 
+                              color=config["Composite model color"] if config["Composite model color"] is not None else "red", 
+                              label='Composite model')
  
             y_max = max(y.max(), composite.max())
             
@@ -1317,45 +1350,68 @@ class Plotting:
             diff = y_max - y_min
             ax_bott_right.set_ylim(0-0.05*diff, diff + 0.05*diff)
             ax_bott_left.set_ylim(y_min-0.05*diff, y_max + 0.05*diff)
-            ax_bott_right.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)") 
+            ax_bott_right.set_ylabel(config["Y axis label"] if config["Y axis label"] is not None else "Intensity (arb. u.)") 
             ax_bott_left.legend(loc='upper left')
             ax_bott_right.legend(loc='upper right')
-            ax_bott_left.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
-            ax_bott_left.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
+            ax_bott_left.set_xlabel(config["X axis label"] if config["X axis label"] is not None else "Raman shift (cm$^{-1}$)")
+            ax_bott_left.set_ylabel(config["Y axis label"] if config["Y axis label"] is not None else "Intensity (arb. u.)")
             
             if filtered_data is not None:
                 residual = filtered_data["Y"] - composite_at_x
             else:
                 residual = y - composite_at_x
             
-            ax_top = fig.add_subplot(gs[0,0])
-            ax_top.plot(x, residual, 'k-')
-            ax_top.axhline(0, color='red', linestyle='--', linewidth=0.8)
-            ax_top.set_ylabel("Residual")
-            ax_top.tick_params(axis='x', labelbottom=False) 
-            if config["Title"] is not None:
-                ax_top.set_title(config["Title"])
+            if show_residual:
+                ax_top = fig.add_subplot(gs[0, 0])
+                ax_top.plot(x, residual, 'k-')
+                ax_top.axhline(0, color='red', linestyle='--', linewidth=0.8)
+                ax_top.set_ylabel("Residual")
+                ax_top.tick_params(axis='x', labelbottom=False)
+                if config.get("Plot title"):
+                    ax_top.set_title(config["Plot title"])
+            else:
+                if config.get("Plot title"):
+                    ax_bott_left.set_title(config["Plot title"])
+            
+            # ax_top = fig.add_subplot(gs[0,0])
+            # ax_top.plot(x, residual, 'k-')
+            # ax_top.axhline(0, color='red', linestyle='--', linewidth=0.8)
+            # ax_top.set_ylabel("Residual")
+            # ax_top.tick_params(axis='x', labelbottom=False) 
+            # if config["Plot title"] is not None:
+            #     ax_top.set_title(config["Plot title"])
         else:
             ax_left  = fig.add_subplot(111)
             if filtered_data is not None:
-                ax_left.plot(x, y, linestyle = 'dotted', color = 'blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)", alpha = 0.5)
-                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, color='blue', label=config["Raw label"] + " (filtered)" if config["Raw label"] is not None else f"{filename} (filtered)")
+                ax_left.plot(x, y, linestyle = 'dotted', 
+                             color = config["Raw spectrum color"] if config["Raw spectrum color"] is not None else "blue", 
+                             label=config["Raw spectrum label"] if config["Raw spectrum label"] is not None else f"{filename} (raw)", alpha = 0.5)
+                ax_left.plot(filtered_data["X"].values, filtered_data["Y"].values, 
+                             color=config["Raw spectrum color"] if config["Raw spectrum color"] is not None else "blue", 
+                             label=config["Raw spectrum label"] + " (filtered)" if config["Raw spectrum label"] is not None else f"{filename} (filtered)")
             else:
-                ax_left.plot(x, y, color = 'blue', label=config["Raw label"] if config["Raw label"] is not None else f"{filename} (raw)")
+                ax_left.plot(x, y, 
+                             color = config["Raw spectrum color"] if config["Raw spectrum color"] is not None else "blue", 
+                             label=config["Raw spectrum label"] if config["Raw spectrum label"] is not None else f"{filename} (raw)")
             if compare_data is not None:
+                offset = config["Compare spectrum offset"] if config["Compare spectrum offset"] is not None else 0
                 if filtered_compare_data is not None:
-                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"],
-                                 linestyle = 'dotted', color = 'green', 
-                                 label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)", alpha = 0.5)
-                    ax_left.plot(filtered_compare_data["X"].values, filtered_compare_data["Y"].values + config["Compare offset"],
-                                 color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (filtered)")
+                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values + offset,
+                                 linestyle = 'dotted', 
+                                 color = config["Compare spectrum color"] if config["Compare spectrum color"] is not None else "green", 
+                                 label=config["Compare spectrum label"] if config["Compare spectrum label"] is not None else f"{compare_filename} (raw)", alpha = 0.5)
+                    ax_left.plot(filtered_compare_data["X"].values, filtered_compare_data["Y"].values + offset,
+                                 color=config["Compare spectrum color"] if config["Compare spectrum color"] is not None else "green", 
+                                 label=config["Compare spectrum label"] if config["Compare spectrum label"] is not None else f"{compare_filename} (filtered)")
                 else:
-                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values + config["Compare offset"], color='green', label=config["Compare label"] if config["Compare label"] is not None else f"{compare_filename} (raw)")
+                    ax_left.plot(compare_data["X"].values, compare_data["Y"].values + offset, 
+                                 color=config["Compare spectrum color"] if config["Compare spectrum color"] is not None else "green", 
+                                 label=config["Compare spectrum label"] if config["Compare spectrum label"] is not None else f"{compare_filename} (raw)")
             ax_left.legend(loc='best')
-            ax_left.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
-            ax_left.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
-            if config["Title"] is not None:
-                ax_left.set_title(config["Title"])
+            ax_left.set_xlabel(config["X axis label"] if config["X axis label"] is not None else "Raman shift (cm$^{-1}$)")
+            ax_left.set_ylabel(config["Y axis label"] if config["Y axis label"] is not None else "Intensity (arb. u.)")
+            if config["Plot title"] is not None:
+                ax_left.set_title(config["Plot title"])
             
     def lin_bcg(row):
         xs = row.index.to_numpy().astype(float)
@@ -1468,8 +1524,8 @@ class Plotting:
 
         # 10) decorate axes
         ax.set_xlim(low_sh, high_sh)
-        ax.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
-        ax.set_ylabel(config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
+        ax.set_xlabel(config["X axis label"] if config["X axis label"] is not None else "Raman shift (cm$^{-1}$)")
+        ax.set_ylabel(config["Y axis label"] if config["Y axis label"] is not None else "Intensity (arb. u.)")
 
         # 11) tighten up
         fig.tight_layout()
@@ -1540,9 +1596,9 @@ class Plotting:
             "SEC": "Potential (mV)"
         }
         ax.set_ylabel(ylabels.get(mode, ""))
-        ax.set_xlabel(config["X axis"] if config["X axis"] is not None else "Raman shift (cm$^{-1}$)")
+        ax.set_xlabel(config["X axis label"] if config["X axis label"] is not None else "Raman shift (cm$^{-1}$)")
         
-        fig.colorbar(img, ax=ax, label=config["Y axis"] if config["Y axis"] is not None else "Intensity (arb. u.)")
+        fig.colorbar(img, ax=ax, label=config["Y axis label"] if config["Y axis label"] is not None else "Intensity (arb. u.)")
         return ax, Data_df
         
     @staticmethod
@@ -1593,7 +1649,45 @@ class Plotting:
 
         fig.tight_layout()
         return ax
-        
+    
+    @staticmethod
+    def copy_figure_to_clipboard(fig):
+        """
+        Copy a Matplotlib figure to the Windows clipboard as an image (CF_DIB format).
+        """
+        import io
+        from PIL import Image
+        import win32clipboard
+        from tkinter import messagebox
+    
+        if fig is None:
+            print("⚠️ No figure available to copy.")
+            messagebox.showinfo("Clipboard", "⚠️ No figure available to copy.")
+            return
+    
+        try:
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=300, bbox_inches="tight", facecolor="white")
+            buf.seek(0)
+            img = Image.open(buf)
+    
+            # Convert to DIB format (strip 14-byte BMP header)
+            output = io.BytesIO()
+            img.convert("RGB").save(output, "BMP")
+            data = output.getvalue()[14:]
+            output.close()
+    
+            win32clipboard.OpenClipboard()
+            win32clipboard.EmptyClipboard()
+            win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
+            win32clipboard.CloseClipboard()
+    
+            print("✅ Figure copied to clipboard as image.")
+            # messagebox.showinfo("Clipboard", "✅ Figure copied to clipboard as image.")
+        except Exception as e:
+            print(f"⚠️ Failed to copy figure to clipboard: {e}")
+            messagebox.showinfo("Clipboard", f"⚠️ Failed to copy figure to clipboard: {e}")
+            
 class Filtering:
     @staticmethod
     def savitzky_golay(x, y, window_length: int, polyorder: int) -> np.ndarray:

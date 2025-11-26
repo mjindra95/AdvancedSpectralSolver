@@ -99,7 +99,27 @@ def asym_lorentzian(x, intensity, center, fwhm, alpha):
 #     epsilon = (x - center) / (fwhm / 2)
 #     return intensity * ((q + epsilon) ** 2) / (1 + epsilon ** 2)
 
-def fano(x, intensity, center, fwhm, q):
+# def fano(x, intensity, center, fwhm, q):
+#     """
+#     Breit–Wigner–Fano (BWF) resonance profile.
+
+#     Parameters
+#     ----------
+#     x : array-like
+#         Independent variable (e.g., frequency or Raman shift).
+#     amplitude/intenisty : float
+#         Peak amplitude scaling factor.
+#     center : float
+#         Resonance position (ω₀).
+#     fwhm : float
+#         Full width at half maximum (Γ).
+#     q : float
+#         Fano asymmetry parameter (q → ∞ → Lorentzian).
+#     """
+#     epsilon = 2 * (x - center) / fwhm
+#     return intensity * ((q + epsilon)**2 / (1 + epsilon**2))
+
+def fano(x, intensity, center, fwhm, Q):
     """
     Breit–Wigner–Fano (BWF) resonance profile.
 
@@ -113,11 +133,15 @@ def fano(x, intensity, center, fwhm, q):
         Resonance position (ω₀).
     fwhm : float
         Full width at half maximum (Γ).
-    q : float
-        Fano asymmetry parameter (q → ∞ → Lorentzian).
+    Q : float
+        Really 1/q parameter based on publication - https://doi.org/10.1103/PhysRevB.90.245140
+        Q (1/q) is used as fitting parameter instead of q
+            otherwise the value was on completely other scale then the rest 
+            and the fitting procedure was not able to optimize it properly
+        Fano asymmetry parameter (q → ∞ (1/q → 0) → Lorentzian).
     """
-    epsilon = 2 * (x - center) / fwhm
-    return intensity * ((q + epsilon)**2 / (1 + epsilon**2))
+    s = (x - center) / fwhm
+    return intensity * ((1+s*Q)**2)/(1+s**2)
 
 
 def double_lorentzian(x, intensity1, center1, intensity2, center2, fwhm):
@@ -193,7 +217,7 @@ model_dict = {
     },
     "Fano": {
         "func": fano,
-        "params": ["intensity", "center", "fwhm", "q"],
+        "params": ["intensity", "center", "fwhm", "1/q"],
     },
     "Double Lorentz": {
         "func": double_lorentzian,

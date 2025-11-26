@@ -43,14 +43,20 @@ class ScrollableFrame(ttk.Frame):
         )
 
         # 5) (Optional) Mouse‐wheel support when hovering over the inner frame
-        self.inner.bind(
-            "<Enter>",
-            lambda e: self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-        )
-        self.inner.bind(
-            "<Leave>",
-            lambda e: self.canvas.unbind_all("<MouseWheel>")
-        )
+        # self.inner.bind(
+        #     "<Enter>",
+        #     lambda e: self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        # )
+        # self.inner.bind(
+        #     "<Leave>",
+        #     lambda e: self.canvas.unbind_all("<MouseWheel>")
+        # )
+        
+        # Bind mouse wheel directly to the inner frame
+        self.inner.bind("<MouseWheel>", self._on_mousewheel)
+        
+        # And also bind it to the canvas (in case pointer is between widgets)
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel)
 
     def _on_mousewheel(self, event):
         # Windows / Mac / Linux delta normalization
@@ -88,6 +94,8 @@ class ModelBuilderWindow(tk.Toplevel):
         add_btn.pack(pady=10)
         clear_btn = ttk.Button(left_frame, text="Clear Model", command=self._on_clear_model)
         clear_btn.pack(pady=10)
+        clip_btn = ttk.Button(left_frame, text="Clip Params", command=self._on_clip_params)
+        clip_btn.pack(pady=10)
 
         # Center/right: scrollable area for blocks
         container = ScrollableFrame(self)
@@ -154,12 +162,120 @@ class ModelBuilderWindow(tk.Toplevel):
             if not blk.label_var.get().strip():
                 default = f"{blk.func_var.get()}_{i}"
                 blk.label_var.set(default)
+    
+    # def _remove_block(self, block):
+    #     """Remove a FunctionBlock and renumber remaining ones."""
+    #     removed_index = block.index
+        
+    #     # 1) Remove this block’s frame and reference
+    #     block.frame.destroy()
+    #     if block in self.function_blocks:
+    #         self.function_blocks.remove(block)
+            
+    #     # 2) Tell the main model to delete that component
+    #     if callable(self.save_callback):
+    #         self.save_callback(removed_index, None)
+            
+    #     # 3) Only renumber blocks BELOW the deleted one
+    #     for blk in self.function_blocks:
+    #         if blk.index > removed_index:
+    #             blk.index -= 1
+    #             blk.frame.config(text=f"Function {blk.index}")
+    
+    #             func_name = blk.func_var.get().strip() or "Function"
+    #             current_label = blk.label_var.get().strip()
+    #             auto_prefix = f"{func_name} #"
+    
+    #             # If label was auto-generated → update it to new index
+    #             if not current_label or current_label.startswith(auto_prefix):
+    #                 new_label = f"{func_name} #{blk.index}"
+    #                 blk.label_var.set(new_label)
+    
+    #             # Save updated block to model
+    #             if callable(self.save_callback):
+    #                 comp = {
+    #                     "model_name": func_name,
+    #                     "label": blk.label_var.get(),
+    #                     "params": {},
+    #                     "bounds": {},
+    #                 }
+    #                 # Re-use existing entries without rebuilding everything
+    #                 for pname, wdict in blk.entries.items():
+    #                     val = wdict["val"].get().strip()
+    #                     mn  = wdict["min"].get().strip()
+    #                     mx  = wdict["max"].get().strip()
+    #                     lock = wdict["lock"].get()
+    
+    #                     try:
+    #                         val = float(val)
+    #                     except ValueError:
+    #                         val = 0.0
+    #                     comp["params"][pname] = val
+    
+    #                     # basic bounds reconstruction
+    #                     try:
+    #                         lb = float(mn) if mn else -np.inf
+    #                     except ValueError:
+    #                         lb = -np.inf
+    #                     try:
+    #                         ub = float(mx) if mx else np.inf
+    #                     except ValueError:
+    #                         ub = np.inf
+    #                     comp["bounds"][pname] = (lb, ub)
+    
+    #                 self.save_callback(blk.index, comp)
+    
+        # # 2) Renumber the remaining blocks
+        # for i, blk in enumerate(self.function_blocks, start=1):
+        #     blk.index = i
+        #     blk.frame.config(text=f"Function {i}")
+    
+        #     # Update automatic label only if user hasn’t set a custom one
+        #     current_label = blk.label_var.get().strip()
+        #     func_name = blk.func_var.get().strip() or "Function"
+        #     auto_label = f"{func_name} #{i}"
+    
+        #     # Only overwrite if the label matches the old pattern or was empty
+        #     if not current_label or current_label.startswith(func_name):
+        #         blk.label_var.set(auto_label)
+                
+        #     blk.on_save()
+    
+        # # 3) Notify the main GUI that the model changed
+        # if callable(self.clear_callback):
+        #     self.clear_callback()
+
                 
     def _on_state(self):
         if self.model_state == True:
             self.model_state == False
         else:
             self.model_state == True
+            
+    def _on_clip_params(self):
+        """Copy all model parameter values (only numbers) to clipboard in a single line."""
+        all_values = []
+    
+        # Iterate through all function blocks
+        for block in self.function_blocks:
+            # Get only parameter values (skip min/max/lock)
+            for pname, wdict in block.entries.items():
+                val_str = wdict["val"].get().strip()
+                if val_str:
+                    all_values.append(val_str)
+                else:
+                    all_values.append("")  # preserve column count if empty
+    
+        # Join as tab-delimited row
+        clip_text = "\t".join(all_values)
+    
+        # Copy to clipboard
+        self.clipboard_clear()
+        self.clipboard_append(clip_text)
+        self.update()  # keep it in clipboard after window closes
+    
+        # messagebox.showinfo("Copied", f"Copied {len(all_values)} parameter values to clipboard.")
+
 
 class FunctionBlock:
     """
@@ -224,20 +340,29 @@ class FunctionBlock:
         func_name = self.func_var.get()
         if func_name not in self.model_functions:
             return
+        
+        #ttk.Label(self.params_frame, text="Parameter").grid(row=1, column=0, sticky="w", pady=(5,2))
+        ttk.Label(self.params_frame, text="Value").grid(row=1, column=1, sticky="w", pady=(5,2))
+        ttk.Label(self.params_frame, text="Min").grid(row=1, column=2, sticky="w", pady=(5,2))
+        ttk.Label(self.params_frame, text="Max").grid(row=1, column=3, sticky="w", pady=(5,2))
+        ttk.Label(self.params_frame, text="Lock").grid(row=1, column=4, sticky="w", pady=(5,2))
 
         params = self.model_functions[func_name]["params"]
-        for row, pname in enumerate(params):
+        for row, pname in enumerate(params, start=2):
             ttk.Label(self.params_frame, text=pname).grid(row=row+1, column=0, sticky="w", pady=2)
             val = ttk.Entry(self.params_frame, width=8); val.grid(row=row+1, column=1, padx=2)
             mn  = ttk.Entry(self.params_frame, width=6); mn .grid(row=row+1, column=2, padx=2)
             mx  = ttk.Entry(self.params_frame, width=6); mx .grid(row=row+1, column=3, padx=2)
             lock_var = tk.BooleanVar()
-            chk = ttk.Checkbutton(self.params_frame, text="Lock", variable=lock_var)
-            chk = ttk.Checkbutton(self.params_frame, text="Lock", variable=lock_var, 
+            #chk = ttk.Checkbutton(self.params_frame, text="Lock", variable=lock_var)
+            #chk = ttk.Checkbutton(self.params_frame, text="Lock", variable=lock_var, 
+            #                      command=lambda pn=pname, lv=lock_var: self._toggle_lock(pn, lv))
+            chk = ttk.Checkbutton(self.params_frame, variable=lock_var, 
                                   command=lambda pn=pname, lv=lock_var: self._toggle_lock(pn, lv))
             chk.grid(row=row+1, column=4, padx=2)
             self.entries[pname] = {"val": val, "min": mn, "max": mx, "lock": lock_var}
-
+            #self.entries[pname] = {"val": val, "min": mn, "max": mx}
+            
         # Enable action buttons
         for b in (self.guess_btn, self.save_btn, self.delete_btn):
             b.config(state="normal")
@@ -331,12 +456,13 @@ class FunctionBlock:
             # intensity = np.trapz(residual, x_data)
             center = x_data[-1]-(x_data[-1]-x_data[0])/2
             fwhm = (x_data[-1]-x_data[0])/4
-            q = 2
-            intensity = max(residual)/(q**2)
+            Q = 0
+            # intensity = max(residual)/(q**2)
+            intensity = max(residual)
             guesses = {"intensity" : intensity,
                        "center" : center,
                        "fwhm" : fwhm,
-                       "q" : q}
+                       "1/q" : Q}
             
         elif func_name in "Asym_Lorentzian":
             intensity = abs(np.trapz(residual, x_data))
@@ -464,16 +590,112 @@ class FunctionBlock:
             if wdict:
                 wdict["lock"].set(locked)
     
+    # def on_save(self):
+    #     func_name = self.func_var.get()
+        
+    #     label = self.label_var.get().strip() or func_name
+    #     pnames    = model_dict[func_name]["params"]
+    
+    #     params = {}
+    #     bounds = {}
+    
+    #     for pname in pnames:
+    #         # 1) Value entry (always required)
+    #         txt_val = self.entries[pname]["val"].get().strip()
+    #         try:
+    #             val = float(txt_val) if txt_val else 0.0
+    #         except ValueError:
+    #             val = 0.0
+    #         params[pname] = val
+    
+    #         # 2) Lock checkbox
+    #         is_locked = self.entries[pname]["lock"].get()
+    
+    #         # 3) Read whatever is in the “min” / “max” entries
+    #         mn_txt = self.entries[pname]["min"].get().strip()
+    #         mx_txt = self.entries[pname]["max"].get().strip()
+    
+    #         if is_locked:
+    #             # If locked, force both bounds = the chosen value
+    #             # lb = ub = val
+    #             if pname == "center":
+    #                 lb = val - 0.1
+    #                 ub = val + 0.1
+    #             elif pname == "fwhm":
+    #                 lb = val - 0.01
+    #                 ub = val + 0.01
+    #             elif pname == "intensity":
+    #                 lb = val*0.99
+    #                 ub = val*1.01
+    #             else:
+    #                 lb = val - 0.1
+    #                 ub = val + 0.1
+
+    #         else:
+    #             # Not locked → pick user‐typed bounds if present,
+    #             # otherwise use our parameter‐specific defaults.
+    
+    #             # LOWER
+    #             if mn_txt:
+    #                 try:
+    #                     lb = float(mn_txt)
+    #                 except ValueError:
+    #                     lb = -np.inf
+    #             else:
+    #                 # no user‐entered lower bound → default by parameter:
+    #                 if pname in ("intensity", "fwhm"):
+    #                     lb = 0.0
+    #                 elif pname == "center":
+    #                     # assume self.last_span exists (xmin, xmax from receive_span_selection)
+    #                     xmin, xmax = self.last_span
+    #                     lb = xmin
+    #                 else:
+    #                     lb = -np.inf
+    
+    #             # UPPER
+    #             if mx_txt:
+    #                 try:
+    #                     ub = float(mx_txt)
+    #                 except ValueError:
+    #                     ub = np.inf
+    #             else:
+    #                 # no user‐entered upper bound → default by parameter:
+    #                 if pname in ("intensity", "fwhm"):
+    #                     ub = np.inf
+    #                 elif pname == "center":
+    #                     xmin, xmax = self.last_span
+    #                     ub = xmax
+    #                 else:
+    #                     ub = np.inf
+    
+    #         bounds[pname] = (lb, ub)
+    
+    #     comp = {
+    #       "model_name": func_name,
+    #       "label":      label,
+    #       "params":     params,
+    #       "bounds":     bounds
+    #     }
+    
+    #     print("🔖 Saving component:", comp)   # for debugging
+    #     self.save_callback(self.index, comp)
+
     def on_save(self):
-        func_name = self.func_var.get()
-        label = self.label_var.get().strip() or func_name
-        pnames    = model_dict[func_name]["params"]
+        func_name = self.func_var.get().strip() or "Function"
+        
+        # If user left the label empty → assign automatic name
+        label = self.label_var.get().strip()
+        if not label:
+            label = f"{func_name} #{self.index}"
+            self.label_var.set(label)  # reflect it in the UI too
+    
+        pnames = model_dict[func_name]["params"]
     
         params = {}
         bounds = {}
     
         for pname in pnames:
-            # 1) Value entry (always required)
+            # --- Value ---
             txt_val = self.entries[pname]["val"].get().strip()
             try:
                 val = float(txt_val) if txt_val else 0.0
@@ -481,61 +703,48 @@ class FunctionBlock:
                 val = 0.0
             params[pname] = val
     
-            # 2) Lock checkbox
+            # --- Lock ---
             is_locked = self.entries[pname]["lock"].get()
     
-            # 3) Read whatever is in the “min” / “max” entries
+            # --- Bounds ---
             mn_txt = self.entries[pname]["min"].get().strip()
             mx_txt = self.entries[pname]["max"].get().strip()
     
             if is_locked:
-                # If locked, force both bounds = the chosen value
-                # lb = ub = val
                 if pname == "center":
-                    lb = val - 0.1
-                    ub = val + 0.1
+                    lb, ub = val - 0.1, val + 0.1
                 elif pname == "fwhm":
-                    lb = val - 0.01
-                    ub = val + 0.01
+                    lb, ub = val - 0.01, val + 0.01
                 elif pname == "intensity":
-                    lb = val*0.99
-                    ub = val*1.01
+                    lb, ub = val * 0.99, val * 1.01
                 else:
-                    lb = val - 0.1
-                    ub = val + 0.1
-
+                    lb, ub = val - 0.1, val + 0.1
             else:
-                # Not locked → pick user‐typed bounds if present,
-                # otherwise use our parameter‐specific defaults.
-    
-                # LOWER
+                # Lower bound
                 if mn_txt:
                     try:
                         lb = float(mn_txt)
                     except ValueError:
                         lb = -np.inf
                 else:
-                    # no user‐entered lower bound → default by parameter:
                     if pname in ("intensity", "fwhm"):
                         lb = 0.0
-                    elif pname == "center":
-                        # assume self.last_span exists (xmin, xmax from receive_span_selection)
+                    elif pname == "center" and hasattr(self, "last_span"):
                         xmin, xmax = self.last_span
                         lb = xmin
                     else:
                         lb = -np.inf
     
-                # UPPER
+                # Upper bound
                 if mx_txt:
                     try:
                         ub = float(mx_txt)
                     except ValueError:
                         ub = np.inf
                 else:
-                    # no user‐entered upper bound → default by parameter:
                     if pname in ("intensity", "fwhm"):
                         ub = np.inf
-                    elif pname == "center":
+                    elif pname == "center" and hasattr(self, "last_span"):
                         xmin, xmax = self.last_span
                         ub = xmax
                     else:
@@ -544,13 +753,13 @@ class FunctionBlock:
             bounds[pname] = (lb, ub)
     
         comp = {
-          "model_name": func_name,
-          "label":      label,
-          "params":     params,
-          "bounds":     bounds
+            "model_name": func_name,
+            "label": label,
+            "params": params,
+            "bounds": bounds
         }
     
-        print("🔖 Saving component:", comp)   # for debugging
+        print("🔖 Saving component:", comp)
         self.save_callback(self.index, comp)
 
     def on_delete(self):

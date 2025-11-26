@@ -58,6 +58,7 @@ class Map_2D(tk.Toplevel):
 
         # build UI
         self._create_widgets()
+        self._bind_shortcuts() 
 
     def _create_widgets(self):
         # ── LEFT: Matplotlib canvas ───────────────────────────────
@@ -228,6 +229,9 @@ class Map_2D(tk.Toplevel):
         #    .grid(row=1, column=0, sticky="ew", pady=(0,15))
 
     # ─── stubs to implement ─────────────────────────────────────
+    def _bind_shortcuts(self):
+        self.bind("<Control-c>", lambda event: Plotting.copy_figure_to_clipboard(self.fig))    
+    
     def _on_load(self):
         source = self.source_var.get()
         
@@ -348,6 +352,7 @@ class Map_2D(tk.Toplevel):
 
         # 4) redraw
         self.ax = new_ax
+        self.fig = self.ax.get_figure()
         self.canvas.draw()
         
     def _on_map_click(self, event):
@@ -373,6 +378,7 @@ class Map_2D(tk.Toplevel):
         menu.add_command(label="Select region", command=self.start_region_selection)
         menu.add_command(label="Reset region", command=self.reset_region_selection)
         menu.add_command(label="Save map", command=self.save_plot)
+        menu.add_command(label="Copy to clipboard", command=lambda: Plotting.copy_figure_to_clipboard(self.fig))
     
         # use the underlying Tk event's root coords
         try:
@@ -390,7 +396,7 @@ class Map_2D(tk.Toplevel):
     def _plot_last_pixel(self):
         
         if getattr(self, "df2d", None) is None:
-            messagebox.showwarning("No map", "Load a map first", parent=self)
+            messagebox.showwarning("No map", "Load a spectral map first", parent=self)
             return
         
         xpix, ypix = self._last_pixel
@@ -491,7 +497,7 @@ class Map_2D(tk.Toplevel):
     def _on_plot_average(self):
         # 1) make sure we have data
         if getattr(self, "df2d", None) is None:
-            messagebox.showwarning("No map", "Load a map first", parent=self)
+            messagebox.showwarning("No map", "Load a spectral map first", parent=self)
             return
 
         # 2) grab all 6 limits (use None if blank)
@@ -614,6 +620,7 @@ class Map_2D(tk.Toplevel):
 
         # 4) redraw
         self.ax = new_ax
+        self.fig = self.ax.get_figure()
         self.canvas.draw()
     
     def _on_save_fit(self):

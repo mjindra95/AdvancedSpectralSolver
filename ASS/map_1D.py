@@ -57,6 +57,7 @@ class Map_1D(tk.Toplevel):
 
         # Build the UI
         self._create_widgets()
+        self._bind_shortcuts() 
 
     def _create_widgets(self):
         # --- LAYOUT CONFIGURATION ---
@@ -210,6 +211,9 @@ class Map_1D(tk.Toplevel):
 
     # --- Callback stubs below; user fills in actual logic ---
 
+    def _bind_shortcuts(self):
+        self.bind("<Control-c>", lambda event: Plotting.copy_figure_to_clipboard(self.fig))    
+
     def _on_load(self):
         """
         Called when “Load” button is pressed.
@@ -327,6 +331,7 @@ class Map_1D(tk.Toplevel):
         # 5) Redraw the embedded figure
         self.ax = new_ax
         self.heatmap_data = Data_df
+        self.fig = self.ax.get_figure()
         self.canvas.draw()
         
         self.plot_type = "Heatmap"
@@ -355,6 +360,7 @@ class Map_1D(tk.Toplevel):
         # 2) redraw
         self.ax = new_ax
         self.overlay_data = Data_df
+        self.fig = self.ax.get_figure()
         self.canvas.draw()
         
         self.plot_type = "Lineplot"
@@ -406,6 +412,7 @@ class Map_1D(tk.Toplevel):
         menu.add_command(label="Select region", command=self.start_region_selection)
         menu.add_command(label="Reset region", command=self.reset_region_selection)
         menu.add_command(label="Save map", command=self._on_save)
+        menu.add_command(label="Copy to clipboard", command=lambda: Plotting.copy_figure_to_clipboard(self.fig))
     
         # use the underlying Tk event's root coords
         try:
